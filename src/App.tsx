@@ -25,7 +25,6 @@ const router = createBrowserRouter(
       <Route path="clientes" element={<CustomersPage />} />
       <Route path="produtos" element={<ProductsPage />} />
       <Route path="linhas" element={<PlaceholderPage />} />
-      <Route path="fotos" element={<PlaceholderPage />} />
       <Route path="fluxogramas" element={<PlaceholderPage />} />
       <Route path="conversas" element={<PlaceholderPage />} />
       <Route path="equivalencias" element={<PlaceholderPage />} />

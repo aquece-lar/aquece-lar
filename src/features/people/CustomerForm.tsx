@@ -1,3 +1,4 @@
+import { Select } from '@/components/Select';
 import { useState, type FormEvent } from 'react';
 import type { Customer, CustomerKind } from '@/types/people';
 import styles from './Form.module.css';
@@ -61,17 +62,20 @@ export function CustomerForm({ initial, sellers, busy, onSubmit, onCancel }: Cus
           />
           {errors.name && <p className={styles.error}>{errors.name}</p>}
         </label>
-        <label className={styles.field}>
-          <span className={styles.label}>Tipo</span>
-          <select
-            className={styles.input}
+        <div className={styles.field}>
+          <label htmlFor="cliente-tipo" className={styles.label}>
+            Tipo
+          </label>
+          <Select
+            id="cliente-tipo"
             value={draft.kind}
-            onChange={(e) => set('kind', e.target.value as CustomerKind)}
-          >
-            <option value="PJ">Empresa (CNPJ)</option>
-            <option value="PF">Pessoa (CPF)</option>
-          </select>
-        </label>
+            options={[
+              { value: 'PJ', label: 'Empresa (CNPJ)' },
+              { value: 'PF', label: 'Pessoa (CPF)' },
+            ]}
+            onChange={(value) => set('kind', value as CustomerKind)}
+          />
+        </div>
         <label className={styles.field}>
           <span className={styles.label}>{draft.kind === 'PJ' ? 'CNPJ' : 'CPF'}</span>
           <input
@@ -98,17 +102,17 @@ export function CustomerForm({ initial, sellers, busy, onSubmit, onCancel }: Cus
           <span className={styles.label}>Cidade</span>
           <input className={styles.input} value={draft.city} onChange={(e) => set('city', e.target.value)} />
         </label>
-        <label className={`${styles.field} ${styles.full}`}>
-          <span className={styles.label}>Vendedor responsável</span>
-          <select className={styles.input} value={draft.seller} onChange={(e) => set('seller', e.target.value)}>
-            <option value="">Sem vendedor</option>
-            {sellerOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className={`${styles.field} ${styles.full}`}>
+          <label htmlFor="cliente-vendedor" className={styles.label}>
+            Vendedor responsável
+          </label>
+          <Select
+            id="cliente-vendedor"
+            value={draft.seller}
+            options={[{ value: '', label: 'Sem vendedor' }, ...sellerOptions.map((name) => ({ value: name, label: name }))]}
+            onChange={(value) => set('seller', value)}
+          />
+        </div>
       </div>
 
       <div className={styles.actions}>

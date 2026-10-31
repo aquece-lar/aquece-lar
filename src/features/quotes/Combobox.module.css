@@ -31,11 +31,11 @@
   top: calc(100% + 4px);
   left: 0;
   z-index: 20;
-  /* Pelo menos a largura do campo; em colunas estreitas (produto) cresce até caber o texto. */
-  min-width: 100%;
+  /* A largura mínima (a do campo) vem de `useFloating`; em colunas estreitas cresce até caber o texto. */
   width: max-content;
   max-width: min(440px, calc(100vw - 32px));
-  max-height: 260px;
+  /* `--float-max` é o espaço restante embaixo, definido por `useFloating`. */
+  max-height: min(260px, var(--float-max, 260px));
   overflow-y: auto;
   margin: 0;
   padding: 4px;

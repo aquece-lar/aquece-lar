@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from '@/components/Icon';
+import { portalTarget, useFloating } from '@/components/useFloating';
 import { matches, normalize } from '@/features/people/useList';
 import formStyles from '@/features/people/Form.module.css';
 import styles from './Combobox.module.css';
@@ -32,6 +34,7 @@ export function Combobox({ id, options, value, onChange, placeholder, invalid, o
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const listId = `${id}-lista`;
+  const pos = useFloating(open, inputRef, listRef);
 
   // Acompanha escolhas feitas por fora, como o vendedor sugerido pelo cliente.
   useEffect(() => {
@@ -39,10 +42,10 @@ export function Combobox({ id, options, value, onChange, placeholder, invalid, o
   }, [selected?.name]);
 
   // Com o nome escolhido no campo, a lista mostra todas as opções.
-  const filtered = text === (selected?.name ?? '') ? options : options.filter((o) => matches(text, o.name, o.hint ?? ''));
+  const filtered =
+    text === (selected?.name ?? '') ? options : options.filter((o) => matches(text, o.name, o.hint ?? ''));
   const typed = text.trim();
-  const canCreate =
-    Boolean(onCreate) && typed !== '' && !options.some((o) => normalize(o.name) === normalize(typed));
+  const canCreate = Boolean(onCreate) && typed !== '' && !options.some((o) => normalize(o.name) === normalize(typed));
   // A opção de cadastro fica depois das encontradas, com o índice seguinte.
   const total = filtered.length + (canCreate ? 1 : 0);
 
@@ -141,48 +144,50 @@ export function Combobox({ id, options, value, onChange, placeholder, invalid, o
         <Icon name="chevDown" size={16} />
       </button>
 
-      {open && (
-        <ul ref={listRef} id={listId} role="listbox" className={styles.list}>
-          {filtered.map((option, index) => (
-            <li
-              key={option.id}
-              id={`${id}-op-${option.id}`}
-              role="option"
-              aria-selected={option.id === value}
-              data-index={index}
-              className={`${styles.option} ${index === active ? styles.active : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onMouseEnter={() => setActive(index)}
-              onClick={() => choose(option)}
-            >
-              <span className={styles.optionText}>
-                <span className={styles.name}>{option.name}</span>
-                {option.hint && <span className={styles.hint}>{option.hint}</span>}
-              </span>
-              {option.id === value && <Icon name="check" size={16} />}
-            </li>
-          ))}
-          {canCreate && (
-            <li
-              id={`${id}-criar`}
-              role="option"
-              aria-selected={false}
-              data-index={filtered.length}
-              className={`${styles.option} ${styles.create} ${active === filtered.length ? styles.active : ''}`}
-              onMouseDown={(e) => e.preventDefault()}
-              onMouseEnter={() => setActive(filtered.length)}
-              onClick={create}
-            >
-              <span className={styles.optionText}>
-                <span className={styles.name}>
-                  <Icon name="plus" size={14} /> Cadastrar “{typed}”
+      {open &&
+        createPortal(
+          <ul ref={listRef} id={listId} role="listbox" className={styles.list} style={pos}>
+            {filtered.map((option, index) => (
+              <li
+                key={option.id}
+                id={`${id}-op-${option.id}`}
+                role="option"
+                aria-selected={option.id === value}
+                data-index={index}
+                className={`${styles.option} ${index === active ? styles.active : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setActive(index)}
+                onClick={() => choose(option)}
+              >
+                <span className={styles.optionText}>
+                  <span className={styles.name}>{option.name}</span>
+                  {option.hint && <span className={styles.hint}>{option.hint}</span>}
                 </span>
-              </span>
-            </li>
-          )}
-          {total === 0 && <li className={styles.empty}>Nenhum resultado para “{typed}”</li>}
-        </ul>
-      )}
+                {option.id === value && <Icon name="check" size={16} />}
+              </li>
+            ))}
+            {canCreate && (
+              <li
+                id={`${id}-criar`}
+                role="option"
+                aria-selected={false}
+                data-index={filtered.length}
+                className={`${styles.option} ${styles.create} ${active === filtered.length ? styles.active : ''}`}
+                onMouseDown={(e) => e.preventDefault()}
+                onMouseEnter={() => setActive(filtered.length)}
+                onClick={create}
+              >
+                <span className={styles.optionText}>
+                  <span className={styles.name}>
+                    <Icon name="plus" size={14} /> Cadastrar “{typed}”
+                  </span>
+                </span>
+              </li>
+            )}
+            {total === 0 && <li className={styles.empty}>Nenhum resultado para “{typed}”</li>}
+          </ul>,
+          portalTarget(inputRef),
+        )}
     </div>
   );
 }

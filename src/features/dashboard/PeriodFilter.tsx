@@ -1,4 +1,4 @@
-import { Icon } from '@/components/Icon';
+import { DatePicker } from '@/components/DatePicker';
 import type { Period } from '@/types/dashboard';
 import styles from './PeriodFilter.module.css';
 
@@ -10,16 +10,14 @@ interface PeriodFilterProps {
 export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
   return (
     <div className={styles.filter} role="group" aria-label="Período">
-      <Icon name="calendar" size={16} />
       <label className={styles.field}>
         De
-        <input
-          type="date"
+        <DatePicker
+          variant="inline"
+          aria-label="Data inicial"
           value={value.from}
           max={value.to}
-          required
-          className={styles.input}
-          onChange={(event) => event.target.value && onChange({ ...value, from: event.target.value })}
+          onChange={(iso) => iso && onChange({ ...value, from: iso })}
         />
       </label>
       <span className={styles.sep} aria-hidden="true">
@@ -27,13 +25,12 @@ export function PeriodFilter({ value, onChange }: PeriodFilterProps) {
       </span>
       <label className={styles.field}>
         Até
-        <input
-          type="date"
+        <DatePicker
+          variant="inline"
+          aria-label="Data final"
           value={value.to}
           min={value.from}
-          required
-          className={styles.input}
-          onChange={(event) => event.target.value && onChange({ ...value, to: event.target.value })}
+          onChange={(iso) => iso && onChange({ ...value, to: iso })}
         />
       </label>
     </div>

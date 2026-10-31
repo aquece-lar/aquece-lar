@@ -1,3 +1,4 @@
+import { Select } from '@/components/Select';
 import { useState, type FormEvent } from 'react';
 import type { Seller, SellerStatus } from '@/types/people';
 import styles from './Form.module.css';
@@ -79,17 +80,20 @@ export function SellerForm({ initial, busy, onSubmit, onCancel }: SellerFormProp
           <span className={styles.label}>Região</span>
           <input className={styles.input} value={draft.region} onChange={(e) => set('region', e.target.value)} />
         </label>
-        <label className={styles.field}>
-          <span className={styles.label}>Status</span>
-          <select
-            className={styles.input}
+        <div className={styles.field}>
+          <label htmlFor="vendedor-status" className={styles.label}>
+            Status
+          </label>
+          <Select
+            id="vendedor-status"
             value={draft.status}
-            onChange={(e) => set('status', e.target.value as SellerStatus)}
-          >
-            <option value="Ativo">Ativo</option>
-            <option value="Inativo">Inativo</option>
-          </select>
-        </label>
+            options={[
+              { value: 'Ativo', label: 'Ativo' },
+              { value: 'Inativo', label: 'Inativo' },
+            ]}
+            onChange={(value) => set('status', value as SellerStatus)}
+          />
+        </div>
       </div>
 
       <div className={styles.actions}>

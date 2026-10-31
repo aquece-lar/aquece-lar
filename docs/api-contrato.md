@@ -232,11 +232,13 @@ interface Product {
   category: 'Aquecedores a gás' | 'Boilers' | 'Lareiras' | 'Piscina' | 'Acessórios' | 'Serviços';
   unitPrice: number;   // preço de tabela (o orçamento pode alterar por item)
   status: 'Ativo' | 'Inativo';
+  photos: string[];    // fotos em ordem; a primeira é a capa (pode ser vazio)
 }
 ```
 
 Regras:
 
+- `photos`: hoje o front guarda cada foto como data URL (JPEG de até 1280 px). Com o backend, o ideal é um upload (`POST /products/:id/photos`, multipart) que devolve a URL; o `PUT` do produto envia a lista final de URLs na ordem desejada. Limite do front: 8 fotos por produto.
 - `code` obrigatório e único (`aqg-20d` conflita com `AQG-20D`): 409 `duplicate_product_code`. `description` com 3+ caracteres; `unitPrice` > 0.
 - **Ordem do `GET`:** ativos primeiro, inativos depois. Um produto novo entra no topo; um produto que acabou de ser inativado vai para o fim da lista. Sugestão: ativos por `createdAt` decrescente e inativos por `inactivatedAt` crescente.
 - Só produtos **ativos** aparecem na busca do orçamento. Ao editar ou duplicar um orçamento antigo, os itens de produtos inativos ou excluídos continuam aparecendo (o front resolve isso com os dados do próprio item).

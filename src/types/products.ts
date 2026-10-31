@@ -18,4 +18,6 @@ export interface Product extends CatalogProduct {
   id: string;
   category: ProductCategory;
   status: ProductStatus;
+  /** Fotos como data URL (JPEG reduzido); a primeira é a capa. */
+  photos?: string[];
 }

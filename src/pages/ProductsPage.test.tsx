@@ -38,7 +38,8 @@ describe('ProductsPage', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Novo produto' });
     await user.type(within(dialog).getByRole('textbox', { name: /código/i }), 'flt-01');
     await user.type(within(dialog).getByRole('textbox', { name: /descrição/i }), 'Filtro de água para aquecedor');
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Categoria' }), 'Acessórios');
+    await user.click(within(dialog).getByRole('combobox', { name: 'Categoria' }));
+    await user.click(screen.getByRole('option', { name: 'Acessórios' }));
     await user.type(within(dialog).getByRole('spinbutton', { name: /preço/i }), '89.9');
     await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
 
@@ -90,7 +91,8 @@ describe('ProductsPage', () => {
     await user.click(within(table()).getByRole('button', { name: 'Ações de Boiler de acumulação 200 L' }));
     await user.click(screen.getByRole('menuitem', { name: /editar/i }));
     const dialog = await screen.findByRole('dialog', { name: 'Editar produto' });
-    await user.selectOptions(within(dialog).getByRole('combobox', { name: 'Status' }), 'Inativo');
+    await user.click(within(dialog).getByRole('combobox', { name: 'Status' }));
+    await user.click(screen.getByRole('option', { name: 'Inativo' }));
     await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(lastRow()).toHaveTextContent('Boiler de acumulação 200 L'));

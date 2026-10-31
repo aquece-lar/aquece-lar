@@ -15,6 +15,9 @@ import { listProducts } from '@/services/productsService';
 import { createQuote, updateQuote } from '@/services/quotesService';
 import type { Customer, Seller } from '@/types/people';
 import type { CatalogProduct, QuoteContact, QuoteDetail, QuoteDiscount } from '@/types/quotes';
+import { DatePicker } from '@/components/DatePicker';
+import { Select } from '@/components/Select';
+
 import formStyles from '@/features/people/Form.module.css';
 import detailStyles from './QuoteDetailPage.module.css';
 import styles from './QuoteFormPage.module.css';
@@ -580,28 +583,30 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
               Condições
             </h2>
             <div className={formStyles.grid}>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>Validade *</span>
-                <input
-                  type="date"
-                  className={formStyles.input}
+              <div className={formStyles.field}>
+                <label htmlFor="validade" className={formStyles.label}>
+                  Validade *
+                </label>
+                <DatePicker
+                  id="validade"
                   value={validUntil}
                   min={today}
-                  onChange={(e) => setValidUntil(e.target.value)}
+                  onChange={setValidUntil}
                   aria-invalid={Boolean(errors.validUntil)}
                 />
                 {errors.validUntil && <p className={formStyles.error}>{errors.validUntil}</p>}
-              </label>
-              <label className={formStyles.field}>
-                <span className={formStyles.label}>Pagamento</span>
-                <select className={formStyles.input} value={paymentTerms} onChange={(e) => choosePayment(e.target.value)}>
-                  {paymentOptions.map((terms) => (
-                    <option key={terms} value={terms}>
-                      {terms}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              </div>
+              <div className={formStyles.field}>
+                <label htmlFor="pagamento" className={formStyles.label}>
+                  Pagamento
+                </label>
+                <Select
+                  id="pagamento"
+                  value={paymentTerms}
+                  options={paymentOptions.map((terms) => ({ value: terms, label: terms }))}
+                  onChange={choosePayment}
+                />
+              </div>
               <label className={`${formStyles.field} ${formStyles.full}`}>
                 <span className={formStyles.label}>Observações</span>
                 <textarea

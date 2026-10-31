@@ -348,3 +348,25 @@
     justify-content: center;
   }
 }
+
+.productCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.thumb {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--subtle);
+}
+
+.thumbEmpty {
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+}

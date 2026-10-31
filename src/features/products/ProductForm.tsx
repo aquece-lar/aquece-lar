@@ -1,16 +1,27 @@
+import { Select } from '@/components/Select';
+import { PhotoField } from '@/features/products/PhotoField';
 import { useState, type FormEvent } from 'react';
 import { sameCode } from '@/services/productsService';
 import { PRODUCT_CATEGORIES, type Product, type ProductCategory, type ProductStatus } from '@/types/products';
 import styles from '@/features/people/Form.module.css';
 
-export type ProductDraft = Pick<Product, 'code' | 'description' | 'category' | 'unitPrice' | 'status'>;
+export type ProductDraft = Pick<Product, 'code' | 'description' | 'category' | 'unitPrice' | 'status'> & {
+  photos: string[];
+};
 
 /** O preço fica como texto enquanto é digitado. */
 type FormState = Omit<ProductDraft, 'unitPrice'> & { unitPrice: string };
 
 type Errors = Partial<Record<keyof FormState, string>>;
 
-const EMPTY: FormState = { code: '', description: '', category: 'Aquecedores a gás', unitPrice: '', status: 'Ativo' };
+const EMPTY: FormState = {
+  code: '',
+  description: '',
+  category: 'Aquecedores a gás',
+  unitPrice: '',
+  status: 'Ativo',
+  photos: [],
+};
 
 interface ProductFormProps {
   initial?: Product;
@@ -25,7 +36,7 @@ interface ProductFormProps {
 
 export function ProductForm({ initial, takenCodes, busy, error, onSubmit, onCancel }: ProductFormProps) {
   const [form, setForm] = useState<FormState>(
-    initial ? { ...initial, unitPrice: String(initial.unitPrice) } : EMPTY,
+    initial ? { ...initial, unitPrice: String(initial.unitPrice), photos: initial.photos ?? [] } : EMPTY,
   );
   const [errors, setErrors] = useState<Errors>({});
 
@@ -74,20 +85,17 @@ export function ProductForm({ initial, takenCodes, busy, error, onSubmit, onCanc
           />
           {errors.code && <p className={styles.error}>{errors.code}</p>}
         </label>
-        <label className={styles.field}>
-          <span className={styles.label}>Categoria</span>
-          <select
-            className={styles.input}
+        <div className={styles.field}>
+          <label htmlFor="produto-categoria" className={styles.label}>
+            Categoria
+          </label>
+          <Select
+            id="produto-categoria"
             value={form.category}
-            onChange={(e) => set('category', e.target.value as ProductCategory)}
-          >
-            {PRODUCT_CATEGORIES.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </label>
+            options={PRODUCT_CATEGORIES.map((category) => ({ value: category, label: category }))}
+            onChange={(value) => set('category', value as ProductCategory)}
+          />
+        </div>
         <label className={`${styles.field} ${styles.full}`}>
           <span className={styles.label}>Descrição *</span>
           <input
@@ -112,17 +120,24 @@ export function ProductForm({ initial, takenCodes, busy, error, onSubmit, onCanc
           />
           {errors.unitPrice && <p className={styles.error}>{errors.unitPrice}</p>}
         </label>
-        <label className={styles.field}>
-          <span className={styles.label}>Status</span>
-          <select
-            className={styles.input}
+        <div className={styles.field}>
+          <label htmlFor="produto-status" className={styles.label}>
+            Status
+          </label>
+          <Select
+            id="produto-status"
             value={form.status}
-            onChange={(e) => set('status', e.target.value as ProductStatus)}
-          >
-            <option value="Ativo">Ativo (aparece nos orçamentos)</option>
-            <option value="Inativo">Inativo</option>
-          </select>
-        </label>
+            options={[
+              { value: 'Ativo', label: 'Ativo (aparece nos orçamentos)' },
+              { value: 'Inativo', label: 'Inativo' },
+            ]}
+            onChange={(value) => set('status', value as ProductStatus)}
+          />
+        </div>
+        <div className={`${styles.field} ${styles.full}`}>
+          <span className={styles.label}>Fotos</span>
+          <PhotoField photos={form.photos} onChange={(photos) => set('photos', photos)} />
+        </div>
       </div>
 
       {error && (

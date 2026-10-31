@@ -1,0 +1,26 @@
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-3);
+}
+
+.trigger[aria-expanded='true'] {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.value {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.placeholder {
+  color: var(--text-3);
+}

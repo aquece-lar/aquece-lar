@@ -81,15 +81,18 @@ describe('novo orçamento', () => {
     const payment = screen.getByRole('combobox', { name: 'Pagamento' });
 
     expect(discount).toHaveValue(5);
-    await user.selectOptions(payment, '3x sem juros no cartão');
+    await user.click(payment);
+    await user.click(screen.getByRole('option', { name: '3x sem juros no cartão' }));
     expect(discount).toHaveValue(null);
-    await user.selectOptions(payment, 'À vista com 5% de desconto');
+    await user.click(payment);
+    await user.click(screen.getByRole('option', { name: 'À vista com 5% de desconto' }));
     expect(discount).toHaveValue(5);
 
     // Desconto digitado à mão não é tocado pela troca.
     await user.clear(discount);
     await user.type(discount, '8');
-    await user.selectOptions(payment, '3x sem juros no cartão');
+    await user.click(payment);
+    await user.click(screen.getByRole('option', { name: '3x sem juros no cartão' }));
     expect(discount).toHaveValue(8);
   });
 

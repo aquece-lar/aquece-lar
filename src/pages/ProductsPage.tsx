@@ -24,6 +24,16 @@ function StatusBadge({ status }: { status: ProductStatus }) {
   return <span className={`${styles.badge} ${status === 'Ativo' ? styles.ok : styles.off}`}>{status}</span>;
 }
 
+function Thumb({ src }: { src?: string }) {
+  return src ? (
+    <img src={src} alt="" className={styles.thumb} />
+  ) : (
+    <span className={`${styles.thumb} ${styles.thumbEmpty}`} aria-hidden="true">
+      <Icon name="image" size={16} />
+    </span>
+  );
+}
+
 export function ProductsPage() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('todos');
@@ -144,9 +154,12 @@ export function ProductsPage() {
                     {products.map((product) => (
                       <tr key={product.id} className={styles.row}>
                         <td>
-                          <span className={styles.personText}>
-                            <span className={styles.name}>{product.description}</span>
-                            <span className={styles.detail}>{product.code}</span>
+                          <span className={styles.productCell}>
+                            <Thumb src={product.photos?.[0]} />
+                            <span className={styles.personText}>
+                              <span className={styles.name}>{product.description}</span>
+                              <span className={styles.detail}>{product.code}</span>
+                            </span>
                           </span>
                         </td>
                         <td className={styles.muted}>{product.category}</td>
@@ -171,10 +184,13 @@ export function ProductsPage() {
                 {products.map((product) => (
                   <li key={product.id} className={styles.itemCard}>
                     <div className={styles.cardTop}>
-                      <span className={styles.personText}>
-                        <span className={styles.name}>{product.description}</span>
-                        <span className={styles.detail}>
-                          {product.code} · {product.category}
+                      <span className={styles.productCell}>
+                        <Thumb src={product.photos?.[0]} />
+                        <span className={styles.personText}>
+                          <span className={styles.name}>{product.description}</span>
+                          <span className={styles.detail}>
+                            {product.code} · {product.category}
+                          </span>
                         </span>
                       </span>
                       <RowMenu
