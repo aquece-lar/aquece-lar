@@ -53,8 +53,9 @@ prototipo/        mockup HTML original (referência visual)
 - Orçamentos: lista com período, busca, filtro de status e paginação; detalhe com troca de status e PDF pela impressão do navegador; criação de orçamento com cliente, vendedor e produto buscáveis pelo nome (com cadastro de cliente ali mesmo), desconto (% ou R$, sugerido pela condição de pagamento) e condições, avisando antes de sair com alterações não salvas; edição de pendentes e cópia de qualquer orçamento
 - Vendedores e clientes: listagem com busca e filtros, cadastro, edição e exclusão
 - Produtos: listagem com busca e filtro de status, cadastro com código único, categoria e preço de tabela; os ativos formam o catálogo do orçamento
-- Linhas, fotos, fluxogramas, conversas, equivalências e configurações ainda são placeholders
+- Configurações: dados da empresa (nome, CNPJ, contato, endereço e logo) no cabeçalho do PDF e um rodapé livre (PIX, banco, garantia); validade, condições de pagamento e observações com que um orçamento novo começa; desconto máximo, acima do qual o orçamento pede confirmação
+- Linhas, fluxogramas, conversas e equivalências ainda são placeholders
 
-Cadastros, edições, mudanças de status e orçamentos novos ficam em memória e se perdem ao recarregar a página. As datas dos orçamentos de exemplo acompanham o relógio (o mais recente é de ontem), e as contagens de orçamentos de clientes e vendedores são calculadas sobre eles.
+Cadastros, configurações, edições, mudanças de status e orçamentos novos ficam em memória e se perdem ao recarregar a página. As datas dos orçamentos de exemplo acompanham o relógio (o mais recente é de ontem), e as contagens de orçamentos de clientes e vendedores são calculadas sobre eles.
 
 O backend ainda não faz parte deste projeto. Para ligar uma API, substitua as funções em `src/services/` (mantendo as assinaturas) e remova os mocks em `src/services/mocks/`. O que o front espera de cada endpoint (formatos, regras e erros) está em [docs/api-contrato.md](docs/api-contrato.md).

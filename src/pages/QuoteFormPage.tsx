@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
-import { DEFAULT_NOTES, PAYMENT_TERMS, VALID_DAYS, termDiscount } from '@/config/quotes';
+import { termDiscount } from '@/config/quotes';
 import { CustomerForm, type CustomerDraft } from '@/features/people/CustomerForm';
 import { Modal } from '@/features/people/Modal';
 import { useList } from '@/features/people/useList';
 import { Combobox, type ComboboxOption } from '@/features/quotes/Combobox';
 import { catalogFor } from '@/features/quotes/catalog';
 import { useQuote } from '@/features/quotes/useQuote';
+import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, initials, toISODate } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
 import { listCustomers, listSellers, newId, saveCustomer } from '@/services/peopleService';
@@ -15,6 +16,7 @@ import { listProducts } from '@/services/productsService';
 import { createQuote, updateQuote } from '@/services/quotesService';
 import type { Customer, Seller } from '@/types/people';
 import type { CatalogProduct, QuoteContact, QuoteDetail, QuoteDiscount } from '@/types/quotes';
+import type { QuoteDefaults } from '@/types/settings';
 import { DatePicker } from '@/components/DatePicker';
 import { Select } from '@/components/Select';
 
@@ -56,9 +58,9 @@ function lineTotal(line: Line): number {
   return Number.isFinite(total) ? total : 0;
 }
 
-function defaultValidUntil(): string {
+function defaultValidUntil(days: number): string {
   const now = new Date();
-  return toISODate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + VALID_DAYS));
+  return toISODate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + days));
 }
 
 function validateLine(line: Line): LineErrors {
@@ -177,9 +179,11 @@ interface QuoteFormProps {
   /** Só vendedores ativos. */
   sellers: Seller[];
   catalog: CatalogProduct[];
+  /** Valores iniciais de um orçamento novo (validade, pagamento, observações). */
+  defaults: QuoteDefaults;
 }
 
-function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }: QuoteFormProps) {
+function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, defaults }: QuoteFormProps) {
   const navigate = useNavigate();
   const text = headText(mode, base?.number ?? '');
   const backTo = base ? `/orcamentos/${base.id}` : '/orcamentos';
@@ -206,9 +210,9 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
   const nextKey = useRef(lines.length);
   // A cópia ganha validade nova; a edição mantém a original.
   const [validUntil, setValidUntil] = useState(() =>
-    mode === 'edit' && base ? base.validUntil : defaultValidUntil(),
+    mode === 'edit' && base ? base.validUntil : defaultValidUntil(defaults.validDays),
   );
-  const [paymentTerms, setPaymentTerms] = useState(base?.paymentTerms ?? PAYMENT_TERMS[0] ?? '');
+  const [paymentTerms, setPaymentTerms] = useState(base?.paymentTerms ?? defaults.paymentTerms[0] ?? '');
   // Orçamento novo já começa com o desconto que a condição padrão promete.
   const [discountType, setDiscountType] = useState<DiscountType>(base?.discount?.type ?? 'percent');
   const [discountValue, setDiscountValue] = useState(() => {
@@ -216,10 +220,11 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
     const percent = termDiscount(paymentTerms);
     return percent === null ? '' : String(percent);
   });
-  const [notes, setNotes] = useState(base?.notes ?? DEFAULT_NOTES);
+  const [notes, setNotes] = useState(base?.notes ?? defaults.notes);
   const [errors, setErrors] = useState<Errors>({});
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [confirmingDiscount, setConfirmingDiscount] = useState(false);
 
   const customerOptions = useMemo(
     () => customers.map((c) => ({ id: c.id, name: c.name, hint: c.city })),
@@ -227,7 +232,9 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
   );
   const sellerOptions = useMemo(() => sellers.map((s) => ({ id: s.id, name: s.name, hint: s.region })), [sellers]);
   // Mantém na lista uma forma de pagamento antiga que saiu da configuração.
-  const paymentOptions = PAYMENT_TERMS.includes(paymentTerms) ? PAYMENT_TERMS : [paymentTerms, ...PAYMENT_TERMS];
+  const paymentOptions = defaults.paymentTerms.includes(paymentTerms)
+    ? defaults.paymentTerms
+    : [paymentTerms, ...defaults.paymentTerms];
 
   const customer = customers.find((c) => c.id === customerId) ?? null;
   const seller = sellers.find((s) => s.id === sellerId) ?? null;
@@ -248,6 +255,10 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
     lines.map((line) => ({ quantity: 1, unitPrice: lineTotal(line) })),
     discount,
   );
+  // Desconto efetivo em % do subtotal, seja ele digitado em % ou em R$.
+  const discountPercent = totals.subtotal > 0 ? Math.round((totals.discount / totals.subtotal) * 10_000) / 100 : 0;
+  const maxDiscount = defaults.maxDiscountPercent;
+  const overLimit = maxDiscount !== null && discountPercent > maxDiscount;
   const units = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
   const today = toISODate(new Date());
   const productOptions = useMemo(
@@ -350,8 +361,10 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
     setLines((prev) => prev.filter((line) => line.key !== key));
   }
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  /** `allowOverLimit` vem da confirmação de desconto acima do limite das configurações. */
+  async function submit(event?: FormEvent, allowOverLimit = false) {
+    event?.preventDefault();
+    setConfirmingDiscount(false);
     const found: Errors = {};
     if (!customer) found.customer = 'Escolha o cliente.';
     if (!seller) found.seller = 'Escolha o vendedor.';
@@ -372,6 +385,10 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
     if (Object.keys(lineErrors).length > 0) found.lines = lineErrors;
     setErrors(found);
     if (Object.keys(found).length > 0 || !customerContact || !sellerContact) return;
+    if (overLimit && !allowOverLimit) {
+      setConfirmingDiscount(true);
+      return;
+    }
 
     const draft = {
       customerInfo: customerContact,
@@ -570,7 +587,16 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
                   </span>
                 </div>
               </div>
-              {errors.discount && <p className={`${formStyles.error} ${styles.summaryError}`}>{errors.discount}</p>}
+              {errors.discount ? (
+                <p className={`${formStyles.error} ${styles.summaryError}`}>{errors.discount}</p>
+              ) : (
+                overLimit && (
+                  <p className={styles.summaryWarn}>
+                    Desconto de {discountPercent.toLocaleString('pt-BR')}%, acima do limite de{' '}
+                    {maxDiscount?.toLocaleString('pt-BR')}% definido nas configurações.
+                  </p>
+                )
+              )}
             </div>
             <div className={detailStyles.total}>
               <span>Total do orçamento</span>
@@ -657,6 +683,26 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog }:
         )}
       </Modal>
 
+      <Modal
+        open={confirmingDiscount}
+        title="Desconto acima do limite"
+        onClose={() => setConfirmingDiscount(false)}
+        size="sm"
+      >
+        <p className={formStyles.text}>
+          O desconto de <strong>{discountPercent.toLocaleString('pt-BR')}%</strong> ({formatBRL(totals.discount)}) passa
+          do limite de {maxDiscount?.toLocaleString('pt-BR')}% definido nas configurações. Quer salvar mesmo assim?
+        </p>
+        <div className={formStyles.actions}>
+          <button type="button" className="btn btn-secondary" onClick={() => setConfirmingDiscount(false)}>
+            Revisar desconto
+          </button>
+          <button type="button" className="btn btn-primary" onClick={() => submit(undefined, true)} disabled={busy}>
+            Salvar mesmo assim
+          </button>
+        </div>
+      </Modal>
+
       <Modal open={blocker.state === 'blocked'} title="Descartar alterações?" onClose={() => blocker.reset?.()} size="sm">
         <p className={formStyles.text}>
           {mode === 'edit' ? 'As alterações neste orçamento ainda não foram salvas.' : 'Este orçamento ainda não foi salvo.'}{' '}
@@ -683,6 +729,7 @@ export function QuoteFormPage({ mode }: { mode: QuoteFormMode }) {
   const sellersState = useList(listSellers, 'Não foi possível carregar os vendedores.', reloadKey);
   const productsState = useList(listProducts, 'Não foi possível carregar os produtos.', reloadKey);
   const baseState = useQuote(mode === 'new' ? null : id, reloadKey);
+  const settingsState = useSettings(reloadKey);
 
   const activeSellers = useMemo(
     () => (sellersState.data ?? []).filter((s) => s.status === 'Ativo'),
@@ -733,10 +780,14 @@ export function QuoteFormPage({ mode }: { mode: QuoteFormMode }) {
     );
   }
 
-  const loadError = [customersState, sellersState, productsState, baseState].find((s) => s.status === 'error');
+  const loadError = [customersState, sellersState, productsState, baseState, settingsState].find(
+    (s) => s.status === 'error',
+  );
   const customers = customersState.data;
 
-  if (customers && sellersState.data && catalog && (mode === 'new' || baseState.status === 'success')) {
+  const settings = settingsState.data;
+
+  if (customers && sellersState.data && catalog && settings && (mode === 'new' || baseState.status === 'success')) {
     return (
       <QuoteForm
         key={`${mode}-${id}`}
@@ -745,6 +796,7 @@ export function QuoteFormPage({ mode }: { mode: QuoteFormMode }) {
         customers={customers}
         sellers={activeSellers}
         catalog={catalog}
+        defaults={settings.quotes}
       />
     );
   }

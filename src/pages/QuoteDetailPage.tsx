@@ -4,11 +4,13 @@ import { Icon } from '@/components/Icon';
 import { QuoteStatusBadge } from '@/features/dashboard/QuoteStatusBadge';
 import { Modal } from '@/features/people/Modal';
 import { useQuote } from '@/features/quotes/useQuote';
+import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatDate, formatDateTime, initials } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
 import { updateQuoteStatus } from '@/services/quotesService';
 import type { QuoteStatus } from '@/types/dashboard';
 import type { QuoteContact } from '@/types/quotes';
+import type { CompanyInfo } from '@/types/settings';
 import formStyles from '@/features/people/Form.module.css';
 import styles from './QuoteDetailPage.module.css';
 
@@ -72,27 +74,46 @@ function ContactCard({ title, contact }: { title: string; contact: QuoteContact 
   );
 }
 
+/** Cabeçalho só da folha impressa: logo e dados da empresa preenchidos nas configurações. */
+function CompanyHeader({ company }: { company: CompanyInfo }) {
+  const contacts = [company.phone, company.email].filter(Boolean).join(' · ');
+  return (
+    <header className={styles.companyHeader} data-print-only>
+      {company.logo && <img src={company.logo} alt="" className={styles.companyLogo} />}
+      <div className={styles.companyText}>
+        <strong className={styles.companyName}>{company.name}</strong>
+        {company.document && <span>CNPJ {company.document}</span>}
+        {contacts && <span>{contacts}</span>}
+        {company.address && <span>{company.address}</span>}
+      </div>
+    </header>
+  );
+}
+
 export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const [reloadKey, setReloadKey] = useState(0);
   const state = useQuote(id, reloadKey);
+  const settings = useSettings();
   const [confirming, setConfirming] = useState<StatusAction | null>(null);
   const [busy, setBusy] = useState(false);
   const printed = useRef(false);
 
   const quote = state.data;
+  // Sem as configurações (falha ao carregar), a folha sai sem o cabeçalho da empresa.
+  const settingsDone = settings.status !== 'loading';
 
-  // Rota /pdf: abre a impressão uma vez e volta para a URL do detalhe.
+  // Rota /pdf: abre a impressão uma vez (com o cabeçalho pronto) e volta para a URL do detalhe.
   useEffect(() => {
-    if (!autoPrint || !quote || printed.current) return;
+    if (!autoPrint || !quote || !settingsDone || printed.current) return;
     printed.current = true;
     const timer = window.setTimeout(() => {
       window.print();
       navigate(`/orcamentos/${quote.id}`, { replace: true });
     }, 100);
     return () => window.clearTimeout(timer);
-  }, [autoPrint, quote, navigate]);
+  }, [autoPrint, quote, settingsDone, navigate]);
 
   async function changeStatus(action: StatusAction) {
     if (!quote) return;
@@ -139,6 +160,7 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
 
   return (
     <>
+      {settings.data && <CompanyHeader company={settings.data.company} />}
       <Link to="/orcamentos" className={`link-strong ${styles.back}`} data-no-print>
         <Icon name="chevLeft" size={14} />
         Orçamentos
@@ -299,6 +321,12 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
           </section>
         </div>
       </div>
+
+      {settings.data?.company.footer && (
+        <footer className={styles.companyFooter} data-print-only>
+          {settings.data.company.footer}
+        </footer>
+      )}
 
       <Modal
         open={confirming !== null}

@@ -113,6 +113,14 @@
   align-self: flex-end;
 }
 
+.summaryWarn {
+  align-self: flex-end;
+  margin: 0;
+  font-size: 12px;
+  color: var(--warn);
+  text-align: right;
+}
+
 /* Mesmo seletor segmentado do gráfico do dashboard. */
 .toggle {
   display: inline-flex;

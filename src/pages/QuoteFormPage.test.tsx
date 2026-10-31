@@ -4,6 +4,8 @@ import { createMemoryRouter, RouterProvider, useParams } from 'react-router-dom'
 import { describe, expect, it } from 'vitest';
 import { saveProduct } from '@/services/productsService';
 import { getQuote } from '@/services/quotesService';
+import { getSettings, saveSettings } from '@/services/settingsService';
+import { formatDate, toISODate } from '@/lib/format';
 import { QuoteFormPage } from './QuoteFormPage';
 
 function DetailStub() {
@@ -190,5 +192,95 @@ describe('editar e duplicar', () => {
     expect(copy.amount).toBe(original.amount);
     expect(copy.history[0]?.note).toBe('Criado a partir do orçamento #1179');
     expect((await getQuote('1179')).status).toBe(original.status);
+  });
+});
+
+describe('padrões vindos das configurações', () => {
+  it('orçamento novo usa validade, condições e observações configuradas', async () => {
+    const original = await getSettings();
+    await saveSettings({
+      ...original,
+      quotes: {
+        validDays: 30,
+        paymentTerms: ['PIX com 10% de desconto', 'Boleto 30 dias'],
+        notes: 'Frete incluso.',
+        maxDiscountPercent: null,
+      },
+    });
+    try {
+      const { user } = renderAt('/orcamentos/novo');
+      await customerField();
+
+      const now = new Date();
+      const expected = formatDate(toISODate(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 30)));
+      expect(screen.getByRole('button', { name: /validade/i })).toHaveTextContent(expected);
+      expect(screen.getByRole('spinbutton', { name: 'Desconto' })).toHaveValue(10);
+      expect(screen.getByRole('textbox', { name: /observações/i })).toHaveValue('Frete incluso.');
+
+      const payment = screen.getByRole('combobox', { name: 'Pagamento' });
+      expect(payment).toHaveTextContent('PIX com 10% de desconto');
+      await user.click(payment);
+      expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual([
+        'PIX com 10% de desconto',
+        'Boleto 30 dias',
+      ]);
+    } finally {
+      await saveSettings(original);
+    }
+  });
+});
+
+describe('limite de desconto das configurações', () => {
+  it('avisa e pede confirmação acima do limite, em % ou em R$', async () => {
+    const { user } = renderAt('/orcamentos/novo');
+    await choose(user, await customerField(), 'brasa');
+    await choose(user, screen.getByRole('combobox', { name: 'Produto' }), 'boiler');
+
+    // R$ 500 sobre 3.790 dá 13,19%, acima dos 10% padrão.
+    const discount = screen.getByRole('spinbutton', { name: 'Desconto' });
+    await user.click(screen.getByRole('button', { name: 'R$' }));
+    await user.clear(discount);
+    await user.type(discount, '500');
+    expect(screen.getByText(/desconto de 13,19%, acima do limite de 10%/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: '%' }));
+    await user.clear(discount);
+    await user.type(discount, '10');
+    expect(screen.queryByText(/acima do limite/i)).not.toBeInTheDocument();
+
+    await user.clear(discount);
+    await user.type(discount, '15');
+    await user.click(screen.getByRole('button', { name: /salvar orçamento/i }));
+    const dialog = await screen.findByRole('dialog', { name: 'Desconto acima do limite' });
+    await user.click(within(dialog).getByRole('button', { name: 'Revisar desconto' }));
+    expect(screen.queryByRole('dialog', { name: 'Desconto acima do limite' })).not.toBeInTheDocument();
+    expect(discount).toHaveValue(15);
+
+    await user.click(screen.getByRole('button', { name: /salvar orçamento/i }));
+    await user.click(
+      within(await screen.findByRole('dialog', { name: 'Desconto acima do limite' })).getByRole('button', {
+        name: 'Salvar mesmo assim',
+      }),
+    );
+    const detail = await screen.findByText(/^detalhe \d+$/);
+    const saved = await getQuote(detail.textContent?.replace('detalhe ', '') ?? '');
+    expect(saved.discount).toEqual({ type: 'percent', value: 15 });
+  });
+
+  it('sem limite configurado salva direto', async () => {
+    const original = await getSettings();
+    await saveSettings({ ...original, quotes: { ...original.quotes, maxDiscountPercent: null } });
+    try {
+      const { user } = renderAt('/orcamentos/novo');
+      await choose(user, await customerField(), 'brasa');
+      await choose(user, screen.getByRole('combobox', { name: 'Produto' }), 'boiler');
+      const discount = screen.getByRole('spinbutton', { name: 'Desconto' });
+      await user.clear(discount);
+      await user.type(discount, '40');
+      await user.click(screen.getByRole('button', { name: /salvar orçamento/i }));
+      expect(await screen.findByText(/^detalhe \d+$/)).toBeInTheDocument();
+    } finally {
+      await saveSettings(original);
+    }
   });
 });

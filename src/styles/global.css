@@ -37,33 +37,36 @@
   color-scheme: light;
 }
 
-:root[data-tema='escuro'] {
-  --bg: #0e140d;
-  --surface: #151d14;
-  --subtle: #1b251a;
-  --line: #253224;
-  --line-strong: #33432f;
-  --text: #edf1ea;
-  --text-2: #b5c0b0;
-  --text-3: #8d998a;
-  --brand: #7fa374;
-  --brand-soft: #1e2c1c;
-  --accent-soft: #2e1f12;
-  --accent-ink: #f4a469;
-  --side: #18261a;
-  --side-hover: #223621;
-  --ok: #4fd1b8;
-  --ok-bg: #10302a;
-  --warn: #f2c14e;
-  --warn-bg: #33290f;
-  --err: #f2867d;
-  --err-bg: #3a1715;
-  --info: #7db3f0;
-  --info-bg: #132840;
-  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
-  --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
+/* Só na tela: o PDF (impressão) sai sempre com as cores claras, em papel branco. */
+@media screen {
+  :root[data-tema='escuro'] {
+    --bg: #0e140d;
+    --surface: #151d14;
+    --subtle: #1b251a;
+    --line: #253224;
+    --line-strong: #33432f;
+    --text: #edf1ea;
+    --text-2: #b5c0b0;
+    --text-3: #8d998a;
+    --brand: #7fa374;
+    --brand-soft: #1e2c1c;
+    --accent-soft: #2e1f12;
+    --accent-ink: #f4a469;
+    --side: #18261a;
+    --side-hover: #223621;
+    --ok: #4fd1b8;
+    --ok-bg: #10302a;
+    --warn: #f2c14e;
+    --warn-bg: #33290f;
+    --err: #f2867d;
+    --err-bg: #3a1715;
+    --info: #7db3f0;
+    --info-bg: #132840;
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 16px rgba(0, 0, 0, 0.25);
+    --shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.5);
 
-  color-scheme: dark;
+    color-scheme: dark;
+  }
 }
 
 *,
@@ -185,6 +188,12 @@ button {
   width: 36px;
   height: 36px;
   border-radius: 9px;
+}
+
+@media screen {
+  [data-print-only] {
+    display: none !important;
+  }
 }
 
 @media print {

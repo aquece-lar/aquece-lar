@@ -1,38 +1,15 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { Icon } from '@/components/Icon';
+import { resizeImage } from '@/lib/image';
 import styles from './PhotoField.module.css';
 
 export const MAX_PHOTOS = 8;
 const MAX_SIDE = 1280;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 
-function readAsDataURL(file: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-/** Reduz para até 1280 px (JPEG) para o cadastro não ficar pesado; sem canvas, usa o arquivo original. */
-async function toPhoto(file: File): Promise<string> {
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bitmap.width * scale);
-    canvas.height = Math.round(bitmap.height * scale);
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('sem canvas');
-    context.fillStyle = '#fff';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-    return canvas.toDataURL('image/jpeg', 0.85);
-  } catch {
-    return readAsDataURL(file);
-  }
+/** Reduz para até 1280 px (JPEG) para o cadastro não ficar pesado. */
+function toPhoto(file: File): Promise<string> {
+  return resizeImage(file, MAX_SIDE);
 }
 
 interface PhotoFieldProps {

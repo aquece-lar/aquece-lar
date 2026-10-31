@@ -34,6 +34,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 | `listSellers()` / `saveSeller()` / `deleteSeller(id)` | `GET` / `POST`·`PUT` / `DELETE /sellers[/:id]` | Vendedores, orçamento, clientes |
 | `listCustomers()` / `saveCustomer()` / `deleteCustomer(id)` | `GET` / `POST`·`PUT` / `DELETE /customers[/:id]` | Clientes, orçamento |
 | `listProducts()` / `saveProduct()` / `deleteProduct(id)` | `GET` / `POST`·`PUT` / `DELETE /products[/:id]` | Produtos, orçamento |
+| `getSettings()` / `saveSettings(settings)` | `GET` / `PUT /settings` | Configurações, orçamento, PDF |
 
 `save*` hoje cria ou atualiza conforme o id já existir. Na API: `POST` cria (sem id, devolve o registro com id), `PUT /:id` atualiza.
 
@@ -242,6 +243,43 @@ Regras:
 - `code` obrigatório e único (`aqg-20d` conflita com `AQG-20D`): 409 `duplicate_product_code`. `description` com 3+ caracteres; `unitPrice` > 0.
 - **Ordem do `GET`:** ativos primeiro, inativos depois. Um produto novo entra no topo; um produto que acabou de ser inativado vai para o fim da lista. Sugestão: ativos por `createdAt` decrescente e inativos por `inactivatedAt` crescente.
 - Só produtos **ativos** aparecem na busca do orçamento. Ao editar ou duplicar um orçamento antigo, os itens de produtos inativos ou excluídos continuam aparecendo (o front resolve isso com os dados do próprio item).
+
+---
+
+## Configurações — `/settings`
+
+Um único registro (não é lista): `GET /settings` devolve tudo e `PUT /settings` grava o objeto inteiro e devolve o que ficou salvo.
+
+```ts
+interface Settings {
+  company: {
+    name: string;        // obrigatório
+    document: string;    // CNPJ como digitado; vazio se não informado
+    phone: string;
+    email: string;
+    address: string;
+    footer: string;      // texto livre no fim do PDF; quebras de linha valem
+    logo: string | null; // hoje data URL (PNG de até 480 px)
+  };
+  quotes: {
+    validDays: number;       // inteiro de 1 a 365
+    paymentTerms: string[];  // ao menos uma; a primeira é a padrão
+    notes: string;
+    maxDiscountPercent: number | null; // 0 a 100; null = sem limite
+  };
+}
+```
+
+Regras:
+
+- Inválido → 400 `validation` com a mensagem do campo: nome vazio, `validDays` fora de 1–365 ou fracionado, `paymentTerms` vazio, `maxDiscountPercent` fora de 0–100.
+- O front também confere CNPJ (14 dígitos, quando preenchido), e-mail e condições repetidas ou em branco antes de enviar.
+- Um orçamento novo começa com `validUntil` = hoje + `validDays`, a primeira condição e as observações daqui. Orçamentos já criados guardam os próprios textos e não mudam quando as configurações mudam.
+- O desconto sugerido vem do texto da condição ("… 5% de desconto"); a API não precisa interpretar.
+- `company` aparece no cabeçalho do PDF (campos vazios são omitidos) e `footer` no fim da folha.
+- `maxDiscountPercent`: o desconto do orçamento é comparado em % do subtotal (mesmo quando digitado em R$). Acima do limite, o front pede confirmação e salva se o usuário confirmar; a API não recusa. Com login, dá para exigir um perfil de gerente para passar do limite.
+- `logo`: assim como as fotos de produto, o ideal é um upload (`POST /settings/logo`) que devolve a URL, guardada em `logo`.
+- Antes do login, qualquer um pode alterar; com perfis, só administradores deveriam poder fazer o `PUT`.
 
 ---
 

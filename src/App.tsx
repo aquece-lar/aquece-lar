@@ -9,6 +9,7 @@ import { QuoteFormPage } from '@/pages/QuoteFormPage';
 import { QuotesPage } from '@/pages/QuotesPage';
 import { QuoteDetailPage } from '@/pages/QuoteDetailPage';
 import { SellersPage } from '@/pages/SellersPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 
 // Roteador de dados (e não <BrowserRouter>): é o que permite useBlocker no formulário de orçamento.
 const router = createBrowserRouter(
@@ -28,7 +29,7 @@ const router = createBrowserRouter(
       <Route path="fluxogramas" element={<PlaceholderPage />} />
       <Route path="conversas" element={<PlaceholderPage />} />
       <Route path="equivalencias" element={<PlaceholderPage />} />
-      <Route path="configuracoes" element={<PlaceholderPage />} />
+      <Route path="configuracoes" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Route>,
   ),
