@@ -16,6 +16,16 @@ function labelStep(count: number): number {
   return Math.max(1, Math.round(count / 6));
 }
 
+/**
+ * Rótulos contados a partir do último dia, que sempre aparece. O primeiro só
+ * entra se ficar a pelo menos meio intervalo do vizinho, para não encavalar.
+ */
+function showLabel(index: number, count: number, step: number): boolean {
+  const fromEnd = count - 1 - index;
+  if (fromEnd % step === 0) return true;
+  return index === 0 && fromEnd % step >= Math.ceil(step / 2);
+}
+
 export function DailyChart({ points }: { points: DailyPoint[] }) {
   const [metric, setMetric] = useState<Metric>('qtd');
   const [hovered, setHovered] = useState<number | null>(null);
@@ -129,10 +139,9 @@ export function DailyChart({ points }: { points: DailyPoint[] }) {
             </div>
             <div className={styles.xAxis} style={{ '--bar-gap': `${barGap}px` } as CSSProperties} aria-hidden="true">
               {points.map((point, index) => {
-                const show = index === 0 || index === points.length - 1 || (index + 1) % step === 0;
                 return (
                   <span key={point.date} className={styles.xLabel}>
-                    {show ? formatDayMonth(point.date) : ''}
+                    {showLabel(index, points.length, step) ? formatDayMonth(point.date) : ''}
                   </span>
                 );
               })}
