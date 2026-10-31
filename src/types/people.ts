@@ -7,6 +7,8 @@ export interface Seller {
   phone: string;
   region: string;
   status: SellerStatus;
+  /** Meta mensal de valor orçado; `null` = sem meta. */
+  monthlyGoal: number | null;
   /** Orçamentos emitidos no mês corrente. */
   quotes: number;
   /** Valor orçado no mês corrente. */

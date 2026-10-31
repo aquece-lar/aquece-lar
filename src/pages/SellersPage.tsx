@@ -23,6 +23,11 @@ function StatusBadge({ status }: { status: SellerStatus }) {
   return <span className={`${styles.badge} ${status === 'Ativo' ? styles.ok : styles.off}`}>{status}</span>;
 }
 
+/** Quanto da meta do mês o valor orçado no mês já cobre. */
+function goalPercent(seller: Seller): number {
+  return seller.monthlyGoal ? Math.round((seller.amount / seller.monthlyGoal) * 100) : 0;
+}
+
 export function SellersPage() {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<StatusFilter>('todos');
@@ -128,6 +133,9 @@ export function SellersPage() {
                       <th scope="col" className={styles.num}>
                         Valor orçado
                       </th>
+                      <th scope="col" className={styles.num}>
+                        Meta do mês
+                      </th>
                       <th scope="col" className={styles.actionsHead}>
                         <span className="sr-only">Ações</span>
                       </th>
@@ -154,6 +162,16 @@ export function SellersPage() {
                         </td>
                         <td className={styles.num}>{seller.quotes}</td>
                         <td className={styles.num}>{formatBRLRounded(seller.amount)}</td>
+                        <td className={styles.num}>
+                          {seller.monthlyGoal ? (
+                            <span className={styles.goalCell}>
+                              <span>{formatBRLRounded(seller.monthlyGoal)}</span>
+                              <span className={styles.detail}>{goalPercent(seller)}% atingido</span>
+                            </span>
+                          ) : (
+                            <span className={styles.muted}>—</span>
+                          )}
+                        </td>
                         <td className={styles.actionsCell}>
                           <RowMenu
                             label={seller.name}
@@ -194,6 +212,7 @@ export function SellersPage() {
                       <span>
                         {seller.quotes} {seller.quotes === 1 ? 'orçamento' : 'orçamentos'} ·{' '}
                         <span className={styles.cardStrong}>{formatBRLRounded(seller.amount)}</span>
+                        {seller.monthlyGoal ? ` · ${goalPercent(seller)}% da meta` : ''}
                       </span>
                     </div>
                   </li>

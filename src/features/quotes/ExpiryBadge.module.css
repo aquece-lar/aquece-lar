@@ -1,0 +1,25 @@
+/* Sempre vermelho: vazado quando ainda vai vencer, cheio quando já venceu. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--err);
+  border-radius: 999px;
+  color: var(--err);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.expired {
+  background: var(--err);
+  color: #fff;
+}
+
+/* Nas listas: só o relógio e o prazo curto. */
+.compact {
+  gap: 3px;
+  padding: 2px 7px;
+  cursor: default;
+}

@@ -1,5 +1,5 @@
+/* Linha inteira, logo abaixo dos KPIs. */
 .chartCard {
-  flex: 2 1 560px;
   min-width: 0;
   padding: 22px 24px;
   display: flex;
@@ -190,7 +190,6 @@
 @media (max-width: 640px) {
   .chartCard {
     padding: 18px 16px;
-    flex-basis: 100%;
   }
 
   .yAxis {

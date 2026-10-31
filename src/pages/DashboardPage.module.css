@@ -65,6 +65,7 @@
 }
 
 .skelBlock,
+.skelChart,
 .skelWide,
 .skelSide,
 .skelTable {
@@ -72,6 +73,11 @@
   background: linear-gradient(90deg, var(--surface) 0%, var(--subtle) 50%, var(--surface) 100%);
   background-size: 200% 100%;
   animation: pulse 1.4s ease-in-out infinite;
+}
+
+.skelChart {
+  grid-column: 1 / -1;
+  min-height: 340px;
 }
 
 .skelWide {

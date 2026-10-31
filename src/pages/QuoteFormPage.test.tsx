@@ -205,6 +205,7 @@ describe('padrões vindos das configurações', () => {
         paymentTerms: ['PIX com 10% de desconto', 'Boleto 30 dias'],
         notes: 'Frete incluso.',
         maxDiscountPercent: null,
+        expiryAlertDays: 3,
       },
     });
     try {

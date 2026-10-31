@@ -47,3 +47,17 @@ export function inPeriod(iso: string, period: Period): boolean {
   const day = toISODate(new Date(iso));
   return day >= period.from && day <= period.to;
 }
+
+/**
+ * Parte de um valor mensal (ex.: meta) que cabe no período: cada dia vale
+ * 1/(dias do seu mês). Um mês cheio dá o valor inteiro; meio mês, metade.
+ */
+export function prorateMonthly(monthly: number, period: Period): number {
+  const from = parseISODate(period.from);
+  let share = 0;
+  for (let i = 0; i < periodDays(period); i++) {
+    const day = new Date(from.getFullYear(), from.getMonth(), from.getDate() + i);
+    share += 1 / new Date(day.getFullYear(), day.getMonth() + 1, 0).getDate();
+  }
+  return Math.round(monthly * share);
+}

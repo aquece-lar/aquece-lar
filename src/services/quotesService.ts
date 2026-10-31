@@ -52,10 +52,10 @@ export function getQuote(id: string, signal?: AbortSignal): Promise<QuoteDetail>
 }
 
 /** Campos da listagem que derivam do formulário. */
-function summarize(draft: QuoteDraft): Pick<Quote, 'customer' | 'seller' | 'amount'> {
+function summarize(draft: QuoteDraft): Pick<Quote, 'customer' | 'seller' | 'amount' | 'validUntil'> {
   if (draft.items.length === 0) throw new Error('O orçamento precisa de ao menos um item.');
   const { total } = quoteTotals(draft.items, draft.discount);
-  return { customer: draft.customerInfo.name, seller: draft.sellerInfo.name, amount: total };
+  return { customer: draft.customerInfo.name, seller: draft.sellerInfo.name, amount: total, validUntil: draft.validUntil };
 }
 
 /**

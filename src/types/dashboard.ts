@@ -32,6 +32,8 @@ export interface SellerRank {
   name: string;
   quotes: number;
   amount: number;
+  /** Meta mensal proporcional ao período; `null` = vendedor sem meta. */
+  goal: number | null;
 }
 
 export interface RecentQuote {
@@ -43,6 +45,18 @@ export interface RecentQuote {
   status: QuoteStatus;
   /** Data/hora ISO. */
   createdAt: string;
+  /** Data ISO (AAAA-MM-DD) até quando o orçamento vale. */
+  validUntil: string;
+}
+
+/** Orçamentos em aberto perto do vencimento; não depende do período escolhido. */
+export interface ExpirySummary {
+  /** Antecedência do aviso, das configurações. */
+  alertDays: number;
+  /** Pendentes e enviados que vencem de hoje até `alertDays` dias, do mais urgente ao menos. */
+  expiring: RecentQuote[];
+  /** Pendentes e enviados que já passaram da validade. */
+  expired: number;
 }
 
 export interface DashboardData {
@@ -50,4 +64,5 @@ export interface DashboardData {
   daily: DailyPoint[];
   ranking: SellerRank[];
   recentQuotes: RecentQuote[];
+  expiry: ExpirySummary;
 }

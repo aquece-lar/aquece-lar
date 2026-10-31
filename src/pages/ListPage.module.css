@@ -370,3 +370,17 @@
   place-items: center;
   color: var(--text-3);
 }
+
+.goalCell {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}

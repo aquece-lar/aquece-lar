@@ -39,12 +39,16 @@ describe('configurações', () => {
     const days = screen.getByRole('spinbutton', { name: /validade/i });
     await user.clear(days);
     await user.type(days, '0');
+    const alert = screen.getByRole('spinbutton', { name: /aviso de vencimento/i });
+    expect(alert).toHaveValue(3);
+    await user.clear(alert);
     await user.click(screen.getByRole('button', { name: /salvar configurações/i }));
 
     expect(screen.getByText('Informe o nome da empresa.')).toBeInTheDocument();
     expect(screen.getByText('O CNPJ deve ter 14 dígitos.')).toBeInTheDocument();
     expect(screen.getByText('E-mail inválido.')).toBeInTheDocument();
     expect(screen.getByText('De 1 a 365 dias.')).toBeInTheDocument();
+    expect(screen.getByText('De 0 a 60 dias.')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Revise os campos destacados.');
     expect((await getSettings()).company.name).not.toBe('');
   });

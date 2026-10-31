@@ -1,8 +1,9 @@
-import type { DailyPoint, DashboardData, Kpi, Period, SellerRank } from '@/types/dashboard';
+import type { DailyPoint, DashboardData, ExpirySummary, Kpi, Period, SellerRank } from '@/types/dashboard';
 import type { Seller } from '@/types/people';
 import type { Quote } from '@/types/quotes';
 import { formatBRLRounded, parseISODate, toISODate } from '@/lib/format';
-import { inPeriod, previousPeriod } from '../period';
+import { quoteExpiry } from '@/lib/quoteExpiry';
+import { inPeriod, previousPeriod, prorateMonthly } from '../period';
 
 const RECENT_COUNT = 10;
 
@@ -45,7 +46,24 @@ function buildDaily(period: Period, quotes: readonly Quote[]): DailyPoint[] {
  * Simula o que a API vai calcular: tudo sai dos mesmos orçamentos da
  * listagem, então um orçamento novo aparece no dashboard na hora.
  */
-export function buildDashboard(period: Period, allQuotes: readonly Quote[], sellers: Seller[]): DashboardData {
+function buildExpiry(allQuotes: readonly Quote[], alertDays: number): ExpirySummary {
+  const expiring: Quote[] = [];
+  let expired = 0;
+  for (const quote of allQuotes) {
+    const expiry = quoteExpiry(quote, alertDays);
+    if (expiry?.kind === 'expiring') expiring.push(quote);
+    else if (expiry?.kind === 'expired') expired++;
+  }
+  expiring.sort((a, b) => a.validUntil.localeCompare(b.validUntil) || b.amount - a.amount);
+  return { alertDays, expiring, expired };
+}
+
+export function buildDashboard(
+  period: Period,
+  allQuotes: readonly Quote[],
+  sellers: Seller[],
+  alertDays: number,
+): DashboardData {
   const current = allQuotes.filter((q) => inPeriod(q.createdAt, period));
   const previous = allQuotes.filter((q) => inPeriod(q.createdAt, previousPeriod(period)));
   const customers = new Set(current.map((q) => q.customer)).size;
@@ -89,12 +107,13 @@ export function buildDashboard(period: Period, allQuotes: readonly Quote[], sell
 
   const ranking: SellerRank[] = active.map((seller) => {
     const own = current.filter((q) => q.seller === seller.name);
-    return { id: seller.id, name: seller.name, quotes: own.length, amount: sum(own) };
+    const goal = seller.monthlyGoal === null ? null : prorateMonthly(seller.monthlyGoal, period);
+    return { id: seller.id, name: seller.name, quotes: own.length, amount: sum(own), goal };
   });
 
   const recentQuotes = [...current]
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, RECENT_COUNT);
 
-  return { kpis, daily: buildDaily(period, current), ranking, recentQuotes };
+  return { kpis, daily: buildDaily(period, current), ranking, recentQuotes, expiry: buildExpiry(allQuotes, alertDays) };
 }

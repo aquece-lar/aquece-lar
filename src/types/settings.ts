@@ -21,6 +21,8 @@ export interface QuoteDefaults {
   notes: string;
   /** Desconto máximo, em % do subtotal, sem pedir confirmação; `null` é sem limite. */
   maxDiscountPercent: number | null;
+  /** Quantos dias antes do vencimento um orçamento em aberto aparece como "vencendo". */
+  expiryAlertDays: number;
 }
 
 export interface Settings {

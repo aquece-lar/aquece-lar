@@ -1,7 +1,6 @@
 import type { Quote, QuoteDetail, QuoteEvent, QuoteItem } from '@/types/quotes';
-import { toISODate } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
-import { DEFAULT_NOTES, PAYMENT_TERMS, VALID_DAYS, termDiscount } from '@/config/quotes';
+import { DEFAULT_NOTES, PAYMENT_TERMS, termDiscount } from '@/config/quotes';
 import { PRODUCTS_MOCK } from './productsMock';
 
 /** Os orçamentos gerados usam só produtos ativos, sempre na mesma ordem. */
@@ -68,7 +67,6 @@ export function buildQuoteDetail(quote: Quote, history: QuoteEvent[]): QuoteDeta
   const customer = CUSTOMERS_MOCK.find((c) => c.name === quote.customer);
   const seller = SELLERS_MOCK.find((s) => s.name === quote.seller);
   const seed = Number(quote.id) || 0;
-  const validUntil = new Date(Date.parse(quote.createdAt) + VALID_DAYS * 86_400_000);
   const paymentTerms = PAYMENT_TERMS[seed % PAYMENT_TERMS.length]!;
   // Condição com desconto: os itens somam mais e o desconto traz de volta ao valor do mock.
   const percent = termDiscount(paymentTerms);
@@ -89,7 +87,6 @@ export function buildQuoteDetail(quote: Quote, history: QuoteEvent[]): QuoteDeta
       phone: seller?.phone ?? '',
     },
     items: buildItems(quote, subtotal ?? quote.amount),
-    validUntil: toISODate(validUntil),
     paymentTerms,
     discount,
     notes: DEFAULT_NOTES,

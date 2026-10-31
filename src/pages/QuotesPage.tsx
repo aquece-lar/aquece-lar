@@ -5,6 +5,8 @@ import { PeriodFilter } from '@/features/dashboard/PeriodFilter';
 import { QuoteStatusBadge } from '@/features/dashboard/QuoteStatusBadge';
 import { ListToolbar } from '@/features/people/ListToolbar';
 import { matches, useList } from '@/features/people/useList';
+import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
+import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatBRLRounded, formatDateTime, toISODate } from '@/lib/format';
 import { listQuotes } from '@/services/quotesService';
 import type { Period, QuoteStatus } from '@/types/dashboard';
@@ -51,6 +53,8 @@ export function QuotesPage() {
   const { from, to } = period;
   const load = useCallback((signal: AbortSignal) => listQuotes({ from, to }, signal), [from, to]);
   const state = useList(load, 'Não foi possível carregar os orçamentos.', reloadKey);
+  // Antes de carregar as configurações, só os vencidos ganham selo.
+  const alertDays = useSettings().data?.quotes.expiryAlertDays ?? -1;
 
   const all = state.data;
   const searched = useMemo(
@@ -166,7 +170,10 @@ export function QuotesPage() {
                         <td className={styles.muted}>{quote.seller}</td>
                         <td className={styles.num}>{formatBRL(quote.amount)}</td>
                         <td>
-                          <QuoteStatusBadge status={quote.status} />
+                          <span className={styles.badges}>
+                            <QuoteStatusBadge status={quote.status} />
+                            <ExpiryBadge quote={quote} alertDays={alertDays} compact />
+                          </span>
                         </td>
                         <td className={styles.date}>{formatDateTime(quote.createdAt)}</td>
                         <td className={styles.actionsCell}>
@@ -183,7 +190,10 @@ export function QuotesPage() {
                   <li key={quote.id} className={styles.itemCard}>
                     <div className={styles.cardTop}>
                       <span className={styles.name}>{quote.number}</span>
-                      <QuoteStatusBadge status={quote.status} />
+                      <span className={styles.badges}>
+                        <QuoteStatusBadge status={quote.status} />
+                        <ExpiryBadge quote={quote} alertDays={alertDays} compact />
+                      </span>
                     </div>
                     <div>
                       <p className={styles.name}>{quote.customer}</p>

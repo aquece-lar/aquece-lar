@@ -1,5 +1,7 @@
 import type { QuoteStatus } from '@/types/dashboard';
 import type { Quote } from '@/types/quotes';
+import { VALID_DAYS } from '@/config/quotes';
+import { toISODate } from '@/lib/format';
 import { CUSTOMERS_MOCK, SELLERS_MOCK } from './peopleMock';
 
 /**
@@ -20,6 +22,12 @@ function daysAgo(days: number, hours: number, minutes: number): string {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() - days, hours, minutes).toISOString();
 }
 
+/** Validade padrão contada a partir do dia (local) da criação. */
+function validFrom(createdAt: string): string {
+  const created = new Date(createdAt);
+  return toISODate(new Date(created.getFullYear(), created.getMonth(), created.getDate() + VALID_DAYS));
+}
+
 /** Os 10 mais recentes, de 1 a 4 dias atrás; os testes e links de exemplo usam estes números. */
 const RECENT: Array<[number: number, customer: string, seller: string, amount: number, status: QuoteStatus, days: number, time: string]> = [
   [1181, 'Restaurante Brasa Viva', 'Carlos Menezes', 18940, 'Pendente', 1, '09:42'],
@@ -37,7 +45,8 @@ const RECENT: Array<[number: number, customer: string, seller: string, amount: n
 function buildRecent(): Quote[] {
   return RECENT.map(([number, customer, seller, amount, status, days, time]) => {
     const [hours = 0, minutes = 0] = time.split(':').map(Number);
-    return { id: String(number), number: `#${number}`, customer, seller, amount, status, createdAt: daysAgo(days, hours, minutes) };
+    const createdAt = daysAgo(days, hours, minutes);
+    return { id: String(number), number: `#${number}`, customer, seller, amount, status, createdAt, validUntil: validFrom(createdAt) };
   });
 }
 
@@ -59,6 +68,8 @@ function buildOlder(): Quote[] {
   // `slots` vai do mais novo para o mais antigo; o mais novo recebe o #1171.
   return slots.map(({ days, slot }, i) => {
     const number = 1171 - i;
+    // Os do mesmo dia ficam espaçados ao longo do expediente, o último antes das 19h.
+    const createdAt = daysAgo(days, 18 - slot * 2, (number * 37) % 60);
     return {
       id: String(number),
       number: `#${number}`,
@@ -66,8 +77,8 @@ function buildOlder(): Quote[] {
       seller: sellers[(number * 7 + 1) % sellers.length] ?? '',
       amount: 4200 + ((number * 7919) % 380) * 100,
       status: STATUS_CYCLE[number % STATUS_CYCLE.length] ?? 'Enviado',
-      // Os do mesmo dia ficam espaçados ao longo do expediente, o último antes das 19h.
-      createdAt: daysAgo(days, 18 - slot * 2, (number * 37) % 60),
+      createdAt,
+      validUntil: validFrom(createdAt),
     };
   });
 }

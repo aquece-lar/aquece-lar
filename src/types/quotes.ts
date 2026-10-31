@@ -29,8 +29,6 @@ export interface QuoteDetail extends Quote {
   customerInfo: QuoteContact;
   sellerInfo: QuoteContact;
   items: QuoteItem[];
-  /** Data ISO (AAAA-MM-DD) até quando o orçamento vale. */
-  validUntil: string;
   paymentTerms: string;
   /** Desconto sobre a soma dos itens; `null` = sem desconto. */
   discount: QuoteDiscount | null;

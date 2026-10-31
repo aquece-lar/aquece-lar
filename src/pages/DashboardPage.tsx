@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { DailyChart } from '@/features/dashboard/DailyChart';
+import { ExpiringQuotes } from '@/features/dashboard/ExpiringQuotes';
 import { KpiCard } from '@/features/dashboard/KpiCard';
 import { PeriodFilter } from '@/features/dashboard/PeriodFilter';
 import { RecentQuotesTable } from '@/features/dashboard/RecentQuotesTable';
@@ -66,6 +67,7 @@ export function DashboardPage() {
           {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className={`card ${styles.skelBlock}`} />
           ))}
+          <div className={`card ${styles.skelChart}`} />
           <div className={`card ${styles.skelWide}`} />
           <div className={`card ${styles.skelSide}`} />
           <div className={`card ${styles.skelTable}`} />
@@ -77,8 +79,9 @@ export function DashboardPage() {
               <KpiCard key={kpi.id} kpi={kpi} />
             ))}
           </div>
+          <DailyChart points={data.daily} />
           <div className={styles.split}>
-            <DailyChart points={data.daily} />
+            <ExpiringQuotes expiry={data.expiry} />
             <SellerRanking sellers={data.ranking} />
           </div>
           <RecentQuotesTable quotes={data.recentQuotes} />

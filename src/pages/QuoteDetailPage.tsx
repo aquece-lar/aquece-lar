@@ -4,6 +4,7 @@ import { Icon } from '@/components/Icon';
 import { QuoteStatusBadge } from '@/features/dashboard/QuoteStatusBadge';
 import { Modal } from '@/features/people/Modal';
 import { useQuote } from '@/features/quotes/useQuote';
+import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatDate, formatDateTime, initials } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
@@ -171,6 +172,12 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
           <div className={styles.titleRow}>
             <h1 className={styles.h1}>Orçamento {quote.number}</h1>
             <QuoteStatusBadge status={quote.status} />
+            {/* Aviso interno: não vai para o PDF do cliente. */}
+            {settings.data && (
+              <span data-no-print>
+                <ExpiryBadge quote={quote} alertDays={settings.data.quotes.expiryAlertDays} />
+              </span>
+            )}
           </div>
           <p className={styles.sub}>
             Criado em {formatDateTime(quote.createdAt)} · válido até {formatDate(quote.validUntil)}

@@ -61,6 +61,11 @@ interface DashboardData {
   daily: DailyPoint[];      // um ponto por dia do período, em ordem
   ranking: SellerRank[];
   recentQuotes: Quote[];    // os 10 mais recentes do período
+  expiry: {                 // não depende do período: é a situação de hoje
+    alertDays: number;      // settings.quotes.expiryAlertDays
+    expiring: Quote[];      // abertos que vencem de hoje até alertDays, por validUntil crescente
+    expired: number;        // abertos que já passaram de validUntil
+  };
 }
 
 interface DailyPoint {
@@ -70,7 +75,13 @@ interface DailyPoint {
   partial: boolean;  // true no dia de hoje (ainda em andamento)
 }
 
-interface SellerRank { id: string; name: string; quotes: number; amount: number }
+interface SellerRank {
+  id: string;
+  name: string;
+  quotes: number;
+  amount: number;
+  goal: number | null; // meta mensal proporcional ao período; null = sem meta
+}
 ```
 
 Tudo sai dos mesmos orçamentos de `GET /quotes`, para que um orçamento novo apareça no dashboard na hora (a simulação está em `src/services/mocks/dashboardMock.ts`):
@@ -78,7 +89,7 @@ Tudo sai dos mesmos orçamentos de `GET /quotes`, para que um orçamento novo ap
 - **Total de orçamentos** e **Valor total**: quantidade e soma de `amount` no período, com a variação percentual sobre o período anterior de mesmo tamanho (`"+12%"`, `"-8%"`; `"—"` quando o anterior foi zero).
 - **Clientes atendidos**: clientes distintos com orçamento no período, com a diferença absoluta sobre o período anterior (`"+3"`, `"-1"`, `"0"`).
 - **Vendedores ativos**: ativos no cadastro, com `"6 de 8"` no lugar da variação.
-- **Ranking**: um item por vendedor ativo, com quantidade e soma no período (o front ordena por valor).
+- **Ranking**: um item por vendedor ativo, com quantidade e soma no período (o front ordena por valor). `goal` é a `monthlyGoal` do vendedor proporcional ao período: cada dia vale 1/(dias do seu mês), então o mês cheio dá a meta inteira e de 1 a 15 de outubro dá 15/31 dela (`prorateMonthly` em `src/services/period.ts`).
 
 O front pinta a variação de vermelho quando começa com `-` e de neutro quando é `0`, `0%` ou `—`. `Kpi` hoje carrega texto pronto e o ícone (veja [Pontos para decidir](#pontos-para-decidir)).
 
@@ -98,13 +109,13 @@ interface Quote {
   amount: number;     // total já com desconto
   status: QuoteStatus;
   createdAt: string;  // data/hora ISO
+  validUntil: string; // AAAA-MM-DD; vem também na lista, para o selo de vencimento
 }
 
 interface QuoteDetail extends Quote {
   customerInfo: QuoteContact;
   sellerInfo: QuoteContact;
   items: QuoteItem[];
-  validUntil: string;            // AAAA-MM-DD
   paymentTerms: string;
   discount: QuoteDiscount | null;
   notes: string;
@@ -147,6 +158,15 @@ A API deve **calcular** o total, sem confiar no valor enviado. A regra é a de `
 3. `amount` = `subtotal − desconto`.
 
 Exemplo: 2 × 3.790 + 1 × 650 = 8.230; com 5% → desconto 411,50 → total **7.818,50**.
+
+### Validade e vencimento
+
+Não há status "Vencido": é calculado a partir de `validUntil` (regra em `src/lib/quoteExpiry.ts`).
+
+- Só **Pendente** e **Enviado** vencem (esperam resposta do cliente).
+- O orçamento vale até o fim do dia `validUntil`. Depois disso está **vencido**.
+- Está **vencendo** quando faltam de 0 a `expiryAlertDays` dias (configurações).
+- O front mostra o selo na lista, no detalhe (fora do PDF) e no bloco do dashboard. A API só precisa devolver `validUntil` em `Quote` e o resumo `expiry` do dashboard.
 
 ### `GET /quotes?from=&to=`
 
@@ -200,10 +220,11 @@ interface Seller {
   status: 'Ativo' | 'Inativo';
   quotes: number; // orçamentos no mês corrente (calculado pela API)
   amount: number; // valor orçado no mês corrente (calculado pela API)
+  monthlyGoal: number | null; // meta mensal de valor orçado; null = sem meta
 }
 ```
 
-Corpo de criação/edição: `name`, `email`, `phone`, `region`, `status`. Validação: `name` com 3+ caracteres, `email` válido. Só vendedores **ativos** aparecem no orçamento.
+Corpo de criação/edição: `name`, `email`, `phone`, `region`, `status`, `monthlyGoal`. Validação: `name` com 3+ caracteres, `email` válido, `monthlyGoal` nulo ou maior que zero. Só vendedores **ativos** aparecem no orçamento.
 
 ## Clientes — `/customers`
 
@@ -266,18 +287,20 @@ interface Settings {
     paymentTerms: string[];  // ao menos uma; a primeira é a padrão
     notes: string;
     maxDiscountPercent: number | null; // 0 a 100; null = sem limite
+    expiryAlertDays: number;           // inteiro de 0 a 60
   };
 }
 ```
 
 Regras:
 
-- Inválido → 400 `validation` com a mensagem do campo: nome vazio, `validDays` fora de 1–365 ou fracionado, `paymentTerms` vazio, `maxDiscountPercent` fora de 0–100.
+- Inválido → 400 `validation` com a mensagem do campo: nome vazio, `validDays` fora de 1–365 ou fracionado, `paymentTerms` vazio, `maxDiscountPercent` fora de 0–100, `expiryAlertDays` fora de 0–60.
 - O front também confere CNPJ (14 dígitos, quando preenchido), e-mail e condições repetidas ou em branco antes de enviar.
 - Um orçamento novo começa com `validUntil` = hoje + `validDays`, a primeira condição e as observações daqui. Orçamentos já criados guardam os próprios textos e não mudam quando as configurações mudam.
 - O desconto sugerido vem do texto da condição ("… 5% de desconto"); a API não precisa interpretar.
 - `company` aparece no cabeçalho do PDF (campos vazios são omitidos) e `footer` no fim da folha.
 - `maxDiscountPercent`: o desconto do orçamento é comparado em % do subtotal (mesmo quando digitado em R$). Acima do limite, o front pede confirmação e salva se o usuário confirmar; a API não recusa. Com login, dá para exigir um perfil de gerente para passar do limite.
+- `expiryAlertDays`: veja "Validade e vencimento" em Orçamentos.
 - `logo`: assim como as fotos de produto, o ideal é um upload (`POST /settings/logo`) que devolve a URL, guardada em `logo`.
 - Antes do login, qualquer um pode alterar; com perfis, só administradores deveriam poder fazer o `PUT`.
 

@@ -3,7 +3,7 @@ import { Icon } from '@/components/Icon';
 import { termDiscount } from '@/config/quotes';
 import { useSettings } from '@/features/settings/useSettings';
 import { resizeImage } from '@/lib/image';
-import { InvalidSettingsError, MAX_VALID_DAYS, saveSettings } from '@/services/settingsService';
+import { InvalidSettingsError, MAX_ALERT_DAYS, MAX_VALID_DAYS, saveSettings } from '@/services/settingsService';
 import type { CompanyInfo, Settings } from '@/types/settings';
 import formStyles from '@/features/people/Form.module.css';
 import listStyles from './ListPage.module.css';
@@ -23,6 +23,7 @@ interface FormState {
   validDays: string;
   /** Vazio é sem limite. */
   maxDiscount: string;
+  alertDays: string;
   terms: Term[];
   notes: string;
 }
@@ -33,6 +34,7 @@ interface Errors {
   email?: string;
   validDays?: string;
   maxDiscount?: string;
+  alertDays?: string;
   terms?: string;
   term?: Record<number, string>;
 }
@@ -42,6 +44,7 @@ function toForm(settings: Settings): FormState {
     company: { ...settings.company },
     validDays: String(settings.quotes.validDays),
     maxDiscount: settings.quotes.maxDiscountPercent === null ? '' : String(settings.quotes.maxDiscountPercent),
+    alertDays: String(settings.quotes.expiryAlertDays),
     terms: settings.quotes.paymentTerms.map((text, key) => ({ key, text })),
     notes: settings.quotes.notes,
   };
@@ -64,6 +67,7 @@ function toSettings(form: FormState): Settings {
       paymentTerms: form.terms.map((t) => t.text.trim()),
       notes: form.notes.trim(),
       maxDiscountPercent: form.maxDiscount.trim() === '' ? null : Number(form.maxDiscount),
+      expiryAlertDays: Number(form.alertDays),
     },
   };
 }
@@ -82,6 +86,10 @@ function validate(form: FormState): Errors {
   const limit = Number(form.maxDiscount);
   if (form.maxDiscount.trim() !== '' && (!Number.isFinite(limit) || limit < 0 || limit > 100)) {
     errors.maxDiscount = 'De 0 a 100%, ou vazio para sem limite.';
+  }
+  const alertDays = Number(form.alertDays);
+  if (form.alertDays.trim() === '' || !Number.isInteger(alertDays) || alertDays < 0 || alertDays > MAX_ALERT_DAYS) {
+    errors.alertDays = `De 0 a ${MAX_ALERT_DAYS} dias.`;
   }
   if (form.terms.length === 0) errors.terms = 'Informe ao menos uma condição de pagamento.';
   const seen = new Set<string>();
@@ -349,6 +357,25 @@ function SettingsForm({ initial }: { initial: Settings }) {
               <p className={formStyles.error}>{errors.maxDiscount}</p>
             ) : (
               <span className={styles.hint}>Acima disso, o orçamento pede confirmação antes de salvar.</span>
+            )}
+          </label>
+          <label className={formStyles.field}>
+            <span className={formStyles.label}>Aviso de vencimento (dias antes) *</span>
+            <input
+              type="number"
+              min={0}
+              max={MAX_ALERT_DAYS}
+              step={1}
+              inputMode="numeric"
+              className={formStyles.input}
+              value={form.alertDays}
+              onChange={(e) => change((prev) => ({ ...prev, alertDays: e.target.value }))}
+              aria-invalid={Boolean(errors.alertDays)}
+            />
+            {errors.alertDays ? (
+              <p className={formStyles.error}>{errors.alertDays}</p>
+            ) : (
+              <span className={styles.hint}>Pendentes e enviados aparecem como “vencendo” no dashboard e na lista.</span>
             )}
           </label>
 

@@ -29,6 +29,7 @@ describe('settingsService', () => {
     ['sem condições', { quotes: { paymentTerms: [] } }, /condição de pagamento/],
     ['desconto máximo acima de 100%', { quotes: { maxDiscountPercent: 120 } }, /desconto máximo/],
     ['desconto máximo negativo', { quotes: { maxDiscountPercent: -1 } }, /desconto máximo/],
+    ['aviso de vencimento acima de 60 dias', { quotes: { expiryAlertDays: 61 } }, /aviso de vencimento/],
   ])('recusa %s', async (_, patch, message) => {
     const current = await getSettings();
     const next = {

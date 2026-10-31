@@ -3,6 +3,7 @@ import { buildDashboard } from './mocks/dashboardMock';
 import { listSellers } from './peopleService';
 import { validatePeriod } from './period';
 import { quotesSnapshot } from './quotesService';
+import { getSettings } from './settingsService';
 
 export { InvalidPeriodError } from './period';
 
@@ -13,6 +14,6 @@ export { InvalidPeriodError } from './period';
  */
 export async function getDashboard(period: Period, signal?: AbortSignal): Promise<DashboardData> {
   validatePeriod(period);
-  const sellers = await listSellers(signal);
-  return buildDashboard(period, quotesSnapshot(), sellers);
+  const [sellers, settings] = await Promise.all([listSellers(signal), getSettings(signal)]);
+  return buildDashboard(period, quotesSnapshot(), sellers, settings.quotes.expiryAlertDays);
 }

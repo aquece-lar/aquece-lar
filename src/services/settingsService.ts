@@ -3,6 +3,7 @@ import { fromMock } from './mockLatency';
 import { SETTINGS_MOCK } from './mocks/settingsMock';
 
 export const MAX_VALID_DAYS = 365;
+export const MAX_ALERT_DAYS = 60;
 
 /** Cópia em memória: vale até a página ser recarregada, como os demais cadastros. */
 let settings: Settings = structuredClone(SETTINGS_MOCK);
@@ -25,6 +26,10 @@ function check(next: Settings): void {
   const limit = next.quotes.maxDiscountPercent;
   if (limit !== null && (!Number.isFinite(limit) || limit < 0 || limit > 100)) {
     throw new InvalidSettingsError('O desconto máximo deve ser de 0 a 100%.');
+  }
+  const alert = next.quotes.expiryAlertDays;
+  if (!Number.isInteger(alert) || alert < 0 || alert > MAX_ALERT_DAYS) {
+    throw new InvalidSettingsError(`O aviso de vencimento deve ser de 0 a ${MAX_ALERT_DAYS} dias.`);
   }
 }
 
