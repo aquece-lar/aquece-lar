@@ -26,6 +26,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 | Função no front | Endpoint sugerido | Telas |
 |---|---|---|
 | `login(email, password, remember)` | `POST /auth/login` → `{ email, name }` + cookie de sessão HttpOnly; credenciais erradas: 401 `invalid_credentials`. `GET /auth/me` → `{ email, name }`; `POST /auth/logout` → 204. Sem sessão, as outras rotas respondem 401 `unauthorized` | Login |
+| `listUsers()`, `createUser(draft)`, `updateUser(id, draft)`, `deleteUser(id)` | `GET /users` → `[{ id, name, email, createdAt, lastLoginAt, isCurrent }]`; `POST /users` `{ name, email, password }`; `PUT /users/:id` (senha vazia mantém a atual; senha nova derruba as outras sessões); `DELETE /users/:id`. E-mail repetido: 409 `duplicate_email`; excluir a si mesmo: 409 `cannot_delete_self` | Configurações → Usuários |
 | `getDashboard(period)` | `GET /dashboard?from=&to=` | Dashboard |
 | `listQuotes(period)` | `GET /quotes?from=&to=` | Lista de orçamentos |
 | `getQuote(id)` | `GET /quotes/:id` | Detalhe, editar, duplicar |
