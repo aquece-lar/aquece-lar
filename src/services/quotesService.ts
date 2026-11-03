@@ -1,15 +1,17 @@
 import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote, QuoteDetail, QuoteDraft, QuoteEvent } from '@/types/quotes';
 import { quoteTotals } from '@/lib/quoteTotals';
-import { inPeriod, validatePeriod } from './period';
+import { api, ApiError, USE_MOCKS } from './http';
+import { InvalidPeriodError, inPeriod, validatePeriod } from './period';
 import { fromMock } from './mockLatency';
 import { buildHistory, buildQuoteDetail } from './mocks/quoteDetailMock';
 import { QUOTES_MOCK } from './mocks/quotesMock';
 
 /**
- * Cópia em memória: mudanças de status e orçamentos novos valem até a página
- * ser recarregada. O histórico parte do status original do mock e recebe os
- * novos eventos; os orçamentos criados guardam os dados do formulário.
+ * Modo fictício (testes): cópia em memória em que mudanças de status e
+ * orçamentos novos valem até a página ser recarregada. O histórico parte do
+ * status original do mock e recebe os novos eventos; os orçamentos criados
+ * guardam os dados do formulário.
  */
 let quotes = [...QUOTES_MOCK];
 const history = new Map<string, QuoteEvent[]>(QUOTES_MOCK.map((q) => [q.id, buildHistory(q)]));
@@ -19,6 +21,17 @@ export class QuoteNotFoundError extends Error {
   constructor(id: string) {
     super(`Orçamento ${id} não encontrado.`);
     this.name = 'QuoteNotFoundError';
+  }
+}
+
+/** Converte os erros da API nas classes que as telas já tratam. */
+async function viaApi<T>(call: () => Promise<T>, id?: string): Promise<T> {
+  try {
+    return await call();
+  } catch (error) {
+    if (error instanceof ApiError && error.code === 'not_found' && id) throw new QuoteNotFoundError(id);
+    if (error instanceof ApiError && error.code === 'invalid_period') throw new InvalidPeriodError(error.message);
+    throw error;
   }
 }
 
@@ -33,6 +46,10 @@ export function quotesSnapshot(): readonly Quote[] {
 
 /** Orçamentos criados no período, do mais recente para o mais antigo. */
 export function listQuotes(period: Period, signal?: AbortSignal): Promise<Quote[]> {
+  if (!USE_MOCKS) {
+    const query = new URLSearchParams({ from: period.from, to: period.to });
+    return viaApi(() => api<Quote[]>('GET', `/quotes?${query}`, undefined, signal));
+  }
   return fromMock(() => {
     validatePeriod(period);
     return quotes
@@ -42,6 +59,7 @@ export function listQuotes(period: Period, signal?: AbortSignal): Promise<Quote[
 }
 
 export function getQuote(id: string, signal?: AbortSignal): Promise<QuoteDetail> {
+  if (!USE_MOCKS) return viaApi(() => api<QuoteDetail>('GET', `/quotes/${id}`, undefined, signal), id);
   return fromMock(() => {
     const quote = quotes.find((q) => q.id === id);
     if (!quote) throw new QuoteNotFoundError(id);
@@ -63,6 +81,7 @@ function summarize(draft: QuoteDraft): Pick<Quote, 'customer' | 'seller' | 'amou
  * `note` é o primeiro evento do histórico (ex.: de qual orçamento foi copiado).
  */
 export function createQuote(draft: QuoteDraft, note = 'Orçamento criado'): Promise<Quote> {
+  if (!USE_MOCKS) return viaApi(() => api<Quote>('POST', '/quotes', { ...draft, note }));
   return fromMock(() => {
     const next = Math.max(0, ...quotes.map((q) => Number(q.id) || 0)) + 1;
     const createdAt = new Date().toISOString();
@@ -82,6 +101,7 @@ export function createQuote(draft: QuoteDraft, note = 'Orçamento criado'): Prom
 
 /** Só orçamentos pendentes podem ser editados; enviados ou fechados viram cópia. */
 export function updateQuote(id: string, draft: QuoteDraft): Promise<Quote> {
+  if (!USE_MOCKS) return viaApi(() => api<Quote>('PUT', `/quotes/${id}`, draft), id);
   return fromMock(() => {
     const current = quotes.find((q) => q.id === id);
     if (!current) throw new QuoteNotFoundError(id);
@@ -102,7 +122,11 @@ const STATUS_NOTES: Record<QuoteStatus, string> = {
   Cancelado: 'Orçamento cancelado',
 };
 
-export function updateQuoteStatus(id: string, status: QuoteStatus): Promise<void> {
+export async function updateQuoteStatus(id: string, status: QuoteStatus): Promise<void> {
+  if (!USE_MOCKS) {
+    await viaApi(() => api<QuoteDetail>('POST', `/quotes/${id}/status`, { status }), id);
+    return;
+  }
   return fromMock(() => {
     if (!quotes.some((q) => q.id === id)) throw new QuoteNotFoundError(id);
     quotes = quotes.map((q) => (q.id === id ? { ...q, status } : q));

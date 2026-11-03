@@ -27,11 +27,13 @@ function validate(draft: FormState): Errors {
 interface SellerFormProps {
   initial?: Seller;
   busy: boolean;
+  /** Erro ao salvar (ex.: recusado pela API). */
+  error?: string;
   onSubmit: (draft: SellerDraft) => void;
   onCancel: () => void;
 }
 
-export function SellerForm({ initial, busy, onSubmit, onCancel }: SellerFormProps) {
+export function SellerForm({ initial, busy, error, onSubmit, onCancel }: SellerFormProps) {
   const [draft, setDraft] = useState<FormState>(
     initial ? { ...initial, monthlyGoal: initial.monthlyGoal === null ? '' : String(initial.monthlyGoal) } : EMPTY,
   );
@@ -126,6 +128,12 @@ export function SellerForm({ initial, busy, onSubmit, onCancel }: SellerFormProp
           {errors.monthlyGoal && <p className={styles.error}>{errors.monthlyGoal}</p>}
         </label>
       </div>
+
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
 
       <div className={styles.actions}>
         <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>

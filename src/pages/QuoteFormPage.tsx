@@ -13,6 +13,7 @@ import { formatBRL, initials, toISODate } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
 import { listCustomers, listSellers, newId, saveCustomer } from '@/services/peopleService';
 import { listProducts } from '@/services/productsService';
+import { ApiError } from '@/services/http';
 import { createQuote, updateQuote } from '@/services/quotesService';
 import type { Customer, Seller } from '@/types/people';
 import type { CatalogProduct, QuoteContact, QuoteDetail, QuoteDiscount } from '@/types/quotes';
@@ -193,6 +194,7 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
   const customers = useMemo(() => [...created, ...loadedCustomers], [created, loadedCustomers]);
   const [newCustomerName, setNewCustomerName] = useState<string | null>(null);
   const [savingCustomer, setSavingCustomer] = useState(false);
+  const [customerError, setCustomerError] = useState('');
 
   // Cliente e vendedor do orçamento-base são achados pelo nome; se não existirem mais, ficam em branco.
   const [customerId, setCustomerId] = useState(() => customers.find((c) => c.name === base?.customer)?.id ?? '');
@@ -303,11 +305,14 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
 
   async function saveNewCustomer(draft: CustomerDraft) {
     setSavingCustomer(true);
+    setCustomerError('');
     try {
       const customer = await saveCustomer({ id: newId('c'), quotes: 0, lastQuoteAt: null, ...draft });
       setCreated((prev) => [customer, ...prev]);
       setNewCustomerName(null);
       chooseCustomer(customer.id, [customer]);
+    } catch (error) {
+      setCustomerError(error instanceof Error ? error.message : 'Não foi possível salvar o cliente.');
     } finally {
       setSavingCustomer(false);
     }
@@ -418,8 +423,9 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
       saved.current = true;
       navigate(`/orcamentos/${quote.id}`);
     } catch (error) {
-      console.error('Falha ao salvar o orçamento', error);
-      setSaveError('Não foi possível salvar o orçamento. Tente novamente.');
+      // Recusas da API (validação, orçamento que deixou de ser pendente) trazem o motivo.
+      if (!(error instanceof ApiError)) console.error('Falha ao salvar o orçamento', error);
+      setSaveError(error instanceof ApiError ? error.message : 'Não foi possível salvar o orçamento. Tente novamente.');
       setBusy(false);
     }
   }
@@ -677,8 +683,12 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
             initial={{ name: newCustomerName, seller: seller?.name ?? '' }}
             sellers={sellers.map((s) => s.name)}
             busy={savingCustomer}
+            error={customerError}
             onSubmit={saveNewCustomer}
-            onCancel={() => setNewCustomerName(null)}
+            onCancel={() => {
+              setCustomerError('');
+              setNewCustomerName(null);
+            }}
           />
         )}
       </Modal>

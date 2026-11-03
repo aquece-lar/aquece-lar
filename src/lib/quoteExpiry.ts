@@ -1,5 +1,5 @@
 import type { Quote } from '@/types/quotes';
-import { parseISODate, toISODate } from './format';
+import { parseISODate, toISODate } from './format.js';
 
 /** `days`: quantos dias faltam (vencendo) ou já passaram (vencido). */
 export type Expiry = { kind: 'expired'; days: number } | { kind: 'expiring'; days: number };
