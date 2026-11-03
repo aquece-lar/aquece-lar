@@ -25,7 +25,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 
 | Função no front | Endpoint sugerido | Telas |
 |---|---|---|
-| `login(username, password)` | `POST /auth/login` → `{ username, name, token }`; credenciais erradas: 401 `invalid_credentials` | Login |
+| `login(email, password, remember)` | `POST /auth/login` → `{ email, name }` + cookie de sessão HttpOnly; credenciais erradas: 401 `invalid_credentials`. `GET /auth/me` → `{ email, name }`; `POST /auth/logout` → 204. Sem sessão, as outras rotas respondem 401 `unauthorized` | Login |
 | `getDashboard(period)` | `GET /dashboard?from=&to=` | Dashboard |
 | `listQuotes(period)` | `GET /quotes?from=&to=` | Lista de orçamentos |
 | `getQuote(id)` | `GET /quotes/:id` | Detalhe, editar, duplicar |
@@ -321,7 +321,7 @@ Coisas que o front faz hoje porque não há backend, e que devem mudar quando a 
 | Total calculado no front e enviado pronto | API recalcula com a regra acima e ignora o valor enviado | Nenhum |
 | PDF gerado pela impressão do navegador | Pode continuar assim; se o WhatsApp precisar anexar o PDF, gerar no servidor | Nenhum por enquanto |
 | Excluir vendedor ou produto não confere se está em uso | Bloquear (409) ou sugerir inativar quando houver orçamentos ou clientes ligados | Pequeno: tratar a mensagem |
-| Login conferido no navegador contra uma conta fixa (`admin`), sessão no `localStorage`/`sessionStorage` | API valida a senha (com hash) e devolve um token; todas as rotas exigem `Authorization: Bearer` | Pequeno: `authService` guarda o token e os serviços o enviam; a tela de login já existe |
+| ~~Login conferido no navegador contra uma conta fixa~~ | Feito: a API confere a senha (hash scrypt) e a sessão vai num cookie HttpOnly; todas as rotas exigem sessão | Feito. Falta definir perfis (hoje todos têm acesso total) |
 | Lista de orçamentos sem paginação na API | Ok para o volume atual; paginar no servidor se crescer | Médio, só se for paginar |
 
 ## Como o front vai trocar

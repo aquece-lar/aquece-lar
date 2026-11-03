@@ -10,7 +10,8 @@ import styles from './LoginPage.module.css';
 type LoginError = 'credentials' | 'unexpected';
 
 function usernameError(value: string): string {
-  return value.trim() ? '' : 'Informe seu usuário.';
+  if (!value.trim()) return 'Informe seu e-mail.';
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim()) ? '' : 'Informe um e-mail válido.';
 }
 
 function passwordError(value: string): string {
@@ -34,6 +35,7 @@ export function LoginPage() {
   const passwordRef = useRef<HTMLInputElement>(null);
 
   // Com a sessão criada, este redirecionamento leva à página pedida antes do login.
+  if (session === undefined) return null;
   if (session) {
     const from = (location.state as { from?: string } | null)?.from;
     return <Navigate to={from && from !== '/login' ? from : '/'} replace />;
@@ -115,14 +117,14 @@ export function LoginPage() {
         <div className={styles.card}>
           <div className={styles.heading}>
             <h1 className={styles.title}>Bem-vindo de volta</h1>
-            <p className={styles.subtitle}>Acesse com seu usuário e senha</p>
+            <p className={styles.subtitle}>Acesse com seu e-mail e senha</p>
             <div aria-live="assertive">
               {error && (
                 <div className={styles.alert} role="alert">
                   <Icon name="alert" size={20} />
                   {error === 'credentials' ? (
                     <span>
-                      <strong>Usuário ou senha incorretos.</strong> Confira os dados e tente novamente.
+                      <strong>E-mail ou senha incorretos.</strong> Confira os dados e tente novamente.
                     </span>
                   ) : (
                     <span>Não foi possível entrar agora. Tente novamente.</span>
@@ -135,20 +137,21 @@ export function LoginPage() {
           <form className={styles.form} noValidate onSubmit={handleSubmit}>
             <div className={styles.field}>
               <label htmlFor={`${id}-usuario`} className={styles.label}>
-                Usuário
+                E-mail
               </label>
               <div className={styles.control}>
                 <Icon name="user" size={20} className={styles.fieldIcon} />
                 <input
                   ref={usernameRef}
                   id={`${id}-usuario`}
-                  name="username"
-                  type="text"
+                  name="email"
+                  type="email"
+                  inputMode="email"
                   autoComplete="username"
                   autoCapitalize="none"
                   spellCheck={false}
-                  placeholder="Seu usuário"
-                  maxLength={60}
+                  placeholder="seu@email.com"
+                  maxLength={160}
                   className={`${styles.input} ${usernameMessage ? styles.invalid : ''}`}
                   value={username}
                   onChange={(event) => {

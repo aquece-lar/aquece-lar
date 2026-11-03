@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
+import { useUserName } from '@/contexts/AuthContext';
 import { DailyChart } from '@/features/dashboard/DailyChart';
 import { ExpiringQuotes } from '@/features/dashboard/ExpiringQuotes';
 import { KpiCard } from '@/features/dashboard/KpiCard';
@@ -25,6 +26,7 @@ export function DashboardPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const state = useDashboard(period, reloadKey);
   const greet = useMemo(() => greeting(), []);
+  const user = useUserName();
 
   const data = state.data;
   const loading = state.status === 'loading' && !data;
@@ -34,7 +36,7 @@ export function DashboardPage() {
     <>
       <div className={styles.pageHead}>
         <div className={styles.titles}>
-          <h1 className={styles.h1}>{greet}, Administrador</h1>
+          <h1 className={styles.h1}>{greet}, {user.name.split(' ')[0]}</h1>
           <p className={styles.sub}>
             Resumo de {formatDate(period.from)} a {formatDate(period.to)}
           </p>

@@ -4,6 +4,9 @@
  */
 export const USE_MOCKS = import.meta.env.MODE === 'test' || import.meta.env.VITE_USE_MOCKS === 'true';
 
+/** Disparado quando a API recusa a chamada por falta de sessão (o AuthContext volta ao login). */
+export const SESSION_EXPIRED_EVENT = 'aquece-lar:sessao-expirada';
+
 /** Erro devolvido pela API: `{ error, message }` com o status HTTP. */
 export class ApiError extends Error {
   readonly status: number;
@@ -33,6 +36,7 @@ export async function api<T>(method: string, path: string, body?: unknown, signa
   const data: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const error = (data ?? {}) as { error?: string; message?: string };
+    if (response.status === 401 && error.error === 'unauthorized') window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     throw new ApiError(
       response.status,
       error.error ?? 'http_error',

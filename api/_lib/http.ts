@@ -14,15 +14,15 @@ export class ApiError extends Error {
 export const notFound = (what: string) => new ApiError(404, 'not_found', `${what} não encontrado.`);
 export const invalid = (message: string) => new ApiError(400, 'validation', message);
 
-export function json(data: unknown, status = 200): Response {
+export function json(data: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(data), {
     status,
-    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers },
   });
 }
 
-export function noContent(): Response {
-  return new Response(null, { status: 204 });
+export function noContent(headers: Record<string, string> = {}): Response {
+  return new Response(null, { status: 204, headers });
 }
 
 export function errorResponse(error: unknown): Response {

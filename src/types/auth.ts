@@ -1,5 +1,5 @@
-/** Quem está conectado. Com a API, ganha o token que vai nas chamadas. */
+/** Quem está conectado: vem da API (cookie de sessão) ou da conta fictícia nos testes. */
 export interface Session {
-  username: string;
+  email: string;
   name: string;
 }

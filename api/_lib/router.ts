@@ -1,3 +1,4 @@
+import { currentUser, login, logout } from './auth.js';
 import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
 import { getDashboard } from './dashboard.js';
 import { db } from './db.js';
@@ -35,13 +36,27 @@ export async function handle(request: Request, path: string): Promise<Response> 
     const url = new URL(request.url);
     const method = request.method;
     const [resource = '', id, action, ...rest] = path.split('/').filter(Boolean);
-    // Ids são numéricos; qualquer outra coisa não existe.
-    if (rest.length > 0 || (id !== undefined && !/^\d+$/.test(id))) throw new ApiError(404, 'not_found', 'Rota não encontrada.');
 
     if (resource === 'health' && !id) {
       await db()`select 1`;
       return json({ ok: true });
     }
+
+    // Únicas rotas abertas: entrar, sair e saber quem está conectado.
+    if (resource === 'auth' && !action) {
+      if (id === 'login' && method === 'POST') {
+        const { session, setCookie } = await login(request, await readBody(request));
+        return json(session, 200, { 'Set-Cookie': setCookie });
+      }
+      if (id === 'logout' && method === 'POST') return noContent({ 'Set-Cookie': await logout(request) });
+      if (id === 'me' && method === 'GET') return json(await currentUser(request));
+    }
+
+    // Todo o resto exige sessão.
+    await currentUser(request);
+
+    // Ids são numéricos; qualquer outra coisa não existe.
+    if (rest.length > 0 || (id !== undefined && !/^\d+$/.test(id))) throw new ApiError(404, 'not_found', 'Rota não encontrada.');
 
     if (resource === 'dashboard' && !id) {
       if (method !== 'GET') throw METHOD_NOT_ALLOWED;

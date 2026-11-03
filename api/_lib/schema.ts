@@ -70,4 +70,21 @@ export const SCHEMA: string[] = [
     id   smallint primary key default 1 check (id = 1),
     data jsonb not null
   )`,
+  // Login: e-mail único (sem diferenciar maiúsculas) e senha com hash scrypt.
+  `create table if not exists users (
+    id            bigint generated always as identity primary key,
+    email         text not null,
+    name          text not null,
+    password_hash text not null,
+    created_at    timestamptz not null default now()
+  )`,
+  `create unique index if not exists users_email_key on users (lower(email))`,
+  // Sessões: o cookie leva o token; aqui fica só o hash dele.
+  `create table if not exists sessions (
+    token_hash text primary key,
+    user_id    bigint not null references users (id) on delete cascade,
+    expires_at timestamptz not null,
+    created_at timestamptz not null default now()
+  )`,
+  `create index if not exists sessions_user_idx on sessions (user_id)`,
 ];

@@ -12,7 +12,7 @@ function ProtectedStub({ label }: { label: string }) {
   return (
     <>
       <p>{label}</p>
-      <button type="button" onClick={logout}>
+      <button type="button" onClick={() => void logout()}>
         Sair
       </button>
     </>
@@ -53,13 +53,15 @@ describe('LoginPage', () => {
 
   it('valida os campos ao sair deles e ao enviar', async () => {
     const { user } = renderAt('/login');
-    await user.click(screen.getByLabelText('Usuário'));
+    await user.click(await screen.findByLabelText('E-mail'));
     await user.tab();
-    expect(screen.getByText('Informe seu usuário.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Usuário')).toHaveAttribute('aria-invalid', 'true');
+    expect(screen.getByText('Informe seu e-mail.')).toBeInTheDocument();
+    expect(screen.getByLabelText('E-mail')).toHaveAttribute('aria-invalid', 'true');
 
-    await user.type(screen.getByLabelText('Usuário'), 'admin');
-    expect(screen.queryByText('Informe seu usuário.')).not.toBeInTheDocument();
+    await user.type(screen.getByLabelText('E-mail'), 'admin');
+    expect(screen.getByText('Informe um e-mail válido.')).toBeInTheDocument();
+    await user.type(screen.getByLabelText('E-mail'), '@aquecelar.com.br');
+    expect(screen.queryByText('Informe um e-mail válido.')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
     expect(screen.getByText('Informe sua senha.')).toBeInTheDocument();
     expect(screen.getByLabelText('Senha')).toHaveFocus();
@@ -67,19 +69,19 @@ describe('LoginPage', () => {
 
   it('recusa a senha errada', async () => {
     const { user } = renderAt('/login');
-    await user.type(screen.getByLabelText('Usuário'), 'admin');
+    await user.type(await screen.findByLabelText('E-mail'), 'admin@aquecelar.com.br');
     await user.type(screen.getByLabelText('Senha'), 'admin');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
 
     expect(screen.getByRole('button', { name: /entrando/i })).toBeDisabled();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Usuário ou senha incorretos.');
+    expect(await screen.findByRole('alert')).toHaveTextContent('E-mail ou senha incorretos.');
     expect(window.localStorage.getItem('aquece-lar:sessao')).toBeNull();
     expect(window.sessionStorage.getItem('aquece-lar:sessao')).toBeNull();
   });
 
-  it('entra com admin / admin@adm e volta para a página pedida', async () => {
+  it('entra com o e-mail (sem diferenciar maiúsculas) e volta para a página pedida', async () => {
     const { user, router } = renderAt('/orcamentos');
-    await user.type(await screen.findByLabelText('Usuário'), 'admin');
+    await user.type(await screen.findByLabelText('E-mail'), 'ADMIN@aquecelar.com.br');
     await user.type(screen.getByLabelText('Senha'), 'admin@adm');
     await user.click(screen.getByRole('button', { name: 'Mostrar senha' }));
     expect(screen.getByLabelText('Senha')).toHaveAttribute('type', 'text');
@@ -96,7 +98,7 @@ describe('LoginPage', () => {
 
   it('sem "Manter conectado", guarda a sessão só até fechar o navegador', async () => {
     const { user } = renderAt('/login');
-    await user.type(screen.getByLabelText('Usuário'), 'admin');
+    await user.type(await screen.findByLabelText('E-mail'), 'admin@aquecelar.com.br');
     await user.type(screen.getByLabelText('Senha'), 'admin@adm');
     await user.click(screen.getByRole('checkbox', { name: 'Manter conectado' }));
     await user.click(screen.getByRole('button', { name: 'Entrar' }));

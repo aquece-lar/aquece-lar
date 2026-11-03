@@ -27,7 +27,14 @@ Banco:
 ```bash
 npm run db:migrate          # cria as tabelas (pode rodar de novo)
 npm run db:seed             # dados de exemplo, num banco vazio
-npm run db:seed -- --reset  # apaga tudo e coloca os dados de exemplo de novo
+npm run db:seed -- --reset  # apaga tudo e coloca os dados de exemplo de novo (não mexe nos usuários)
+```
+
+Usuários (quem pode entrar no sistema). O script pede a senha no terminal, sem mostrar:
+
+```bash
+npm run user:save -- email@exemplo.com "Nome da Pessoa"   # cria, ou troca a senha se já existir
+npm run user:save -- email@exemplo.com --remove           # remove
 ```
 
 Outros scripts:
@@ -59,7 +66,7 @@ prototipo/        mockup HTML original (referência visual)
 
 ## Comportamento atual
 
-- Login obrigatório para todas as telas: usuário `admin`, senha `admin@adm`. "Manter conectado" guarda a sessão no `localStorage`; sem ele, ela acaba ao fechar o navegador. O botão Sair fica no rodapé do menu. Enquanto não houver API, a conta está em `src/services/mocks/authMock.ts`, visível no código do front: o login organiza o acesso, mas não protege os dados
+- Login obrigatório para todas as telas, com e-mail e senha dos usuários do banco (`npm run user:save`). A sessão é um cookie HttpOnly: com "Manter conectado" dura 30 dias; sem ele, acaba ao fechar o navegador (e no máximo em 12 h). O botão Sair fica no rodapé do menu. Nos dados fictícios, a conta é `admin@aquecelar.com.br` / `admin@adm` (`src/services/mocks/authMock.ts`)
 - Dashboard com período filtrável, KPIs, gráfico diário (quantidade/valor), ranking com a meta de cada vendedor (proporcional ao período), orçamentos vencendo e últimos orçamentos, tudo calculado a partir dos orçamentos (um orçamento novo aparece na hora)
 - Sidebar recolhível no desktop e gaveta no mobile
 - Tema claro/escuro persistido em `localStorage`
@@ -76,6 +83,6 @@ Cadastros, configurações, edições, mudanças de status e orçamentos novos f
 
 `api/index.ts` é a única função da Vercel: o `vercel.json` manda `/api/<caminho>` para ela e `api/_lib/router.ts` atende as rotas de [docs/api-contrato.md](docs/api-contrato.md) (vendedores, clientes, produtos, orçamentos, status, configurações e dashboard). As regras de cálculo (total, períodos, vencimento, dashboard) são as mesmas do front, em `src/lib/`; por isso esses arquivos importam uns aos outros com caminho relativo e `.js`, que é o que a função da Vercel entende.
 
-**Ainda não há login**: quem alcança a API pode ler e alterar tudo. Até ter autenticação, use só os deploys de Preview, que a Vercel protege com o login da conta.
+Login: `POST /api/auth/login` confere a senha (hash scrypt na tabela `users`) e devolve um cookie HttpOnly com a sessão (só o hash do token fica na tabela `sessions`); `GET /api/auth/me` diz quem está conectado e `POST /api/auth/logout` encerra. Fora `/api/health` e essas, toda rota responde 401 sem sessão válida, e o front volta para a tela de login. Por enquanto todos os usuários têm acesso total.
 
 O backend em PHP (`backend/`) foi a primeira versão da API, para MySQL; a Vercel não roda PHP, então ele não é usado.

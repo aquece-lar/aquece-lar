@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "db:migrate": "tsx --env-file=.env.development.local scripts/db-migrate.ts",
     "db:seed": "tsx --tsconfig tsconfig.app.json --env-file=.env.development.local scripts/db-seed.ts",
-    "dev:api": "tsx watch --env-file=.env.development.local scripts/dev-api.ts"
+    "dev:api": "tsx watch --env-file=.env.development.local scripts/dev-api.ts",
+    "user:save": "tsx --env-file=.env.development.local scripts/user-save.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
