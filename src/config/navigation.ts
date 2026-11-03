@@ -1,9 +1,12 @@
 import type { IconName } from '@/components/Icon';
+import type { Permission } from '@/lib/access';
 
 export interface NavItem {
   label: string;
   icon: IconName;
   to: string;
+  /** Só aparece (e só abre) para quem tem a permissão. */
+  permission?: Permission;
 }
 
 export interface NavSection {
@@ -17,7 +20,7 @@ export const NAVIGATION: NavSection[] = [
     items: [
       { label: 'Dashboard', icon: 'grid', to: '/' },
       { label: 'Orçamentos', icon: 'file', to: '/orcamentos' },
-      { label: 'Vendedores', icon: 'user', to: '/vendedores' },
+      { label: 'Vendedores', icon: 'user', to: '/vendedores', permission: 'viewSellers' },
       { label: 'Clientes', icon: 'users', to: '/clientes' },
     ],
   },
@@ -38,7 +41,7 @@ export const NAVIGATION: NavSection[] = [
   },
   {
     title: 'Sistema',
-    items: [{ label: 'Configurações', icon: 'sliders', to: '/configuracoes' }],
+    items: [{ label: 'Configurações', icon: 'sliders', to: '/configuracoes', permission: 'manageSystem' }],
   },
 ];
 

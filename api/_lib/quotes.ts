@@ -1,12 +1,16 @@
+import type { Access } from '../../src/types/auth';
 import type { Period, QuoteStatus } from '../../src/types/dashboard';
 import type { Quote, QuoteContact, QuoteDetail, QuoteDiscount, QuoteEvent, QuoteItem } from '../../src/types/quotes';
+import { can, discountOverLimit, onlyOwn } from '../../src/lib/access.js';
 import { toISODate } from '../../src/lib/format.js';
 import { quoteTotals } from '../../src/lib/quoteTotals.js';
 import { InvalidPeriodError, validatePeriod } from '../../src/services/period.js';
-import { customerIdByName } from './customers.js';
+import { forbidden } from './auth.js';
+import { customerIdByName, customerSellerId } from './customers.js';
 import { db, iso, isUniqueViolation, num, TZ } from './db.js';
 import { ApiError, invalid, notFound } from './http.js';
 import { sellerIdByName } from './sellers.js';
+import { getSettings } from './settings.js';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -27,6 +31,14 @@ function toQuote(row: Record<string, unknown>): Quote {
   };
 }
 
+/**
+ * Vendedor que só vê o que é dele: o id do seu cadastro de vendedor ('0', que não
+ * existe, se não estiver ligado a nenhum). Quem vê tudo: `null`, sem filtro.
+ */
+export function ownSellerId(access: Access): string | null {
+  return onlyOwn(access) ? (access.sellerId ?? '0') : null;
+}
+
 export function checkPeriod(period: Period): void {
   try {
     validatePeriod(period);
@@ -37,32 +49,35 @@ export function checkPeriod(period: Period): void {
 }
 
 /** Orçamentos criados no período (dia de São Paulo), do mais recente para o mais antigo. */
-export async function listQuotes(period: Period): Promise<Quote[]> {
+export async function listQuotes(period: Period, access: Access): Promise<Quote[]> {
   checkPeriod(period);
   const rows = await db().query(
     `select ${LIST_COLUMNS} from quotes
      where (created_at at time zone '${TZ}')::date between $1::date and $2::date
+       and ($3::bigint is null or seller_id = $3::bigint)
      order by created_at desc, id desc`,
-    [period.from, period.to],
+    [period.from, period.to, ownSellerId(access)],
   );
   return rows.map(toQuote);
 }
 
 /** Para o dashboard: criados desde `from`, mais os em aberto de qualquer data (vencimento). */
-export async function quotesForDashboard(from: string): Promise<Quote[]> {
+export async function quotesForDashboard(from: string, access: Access): Promise<Quote[]> {
   const rows = await db().query(
     `select ${LIST_COLUMNS} from quotes
-     where (created_at at time zone '${TZ}')::date >= $1::date or status in ('Pendente', 'Enviado')`,
-    [from],
+     where ((created_at at time zone '${TZ}')::date >= $1::date or status in ('Pendente', 'Enviado'))
+       and ($2::bigint is null or seller_id = $2::bigint)`,
+    [from, ownSellerId(access)],
   );
   return rows.map(toQuote);
 }
 
-export async function getQuote(id: string): Promise<QuoteDetail> {
+/** Orçamento de outro vendedor responde como inexistente para quem só vê os seus. */
+export async function getQuote(id: string, access: Access): Promise<QuoteDetail> {
   const [row] = await db().query(
     `select ${LIST_COLUMNS}, customer_info, seller_info, items, payment_terms, discount, notes
-     from quotes where id = $1`,
-    [id],
+     from quotes where id = $1 and ($2::bigint is null or seller_id = $2::bigint)`,
+    [id, ownSellerId(access)],
   );
   if (!row) throw notFound('Orçamento');
   const events = await db()`select status, at, note from quote_events where quote_id = ${id} order by at, id`;
@@ -132,7 +147,7 @@ function readDiscount(value: unknown, subtotal: number): QuoteDiscount | null {
 }
 
 /** Valida o corpo de POST/PUT e calcula o total no servidor, sem confiar no front. */
-async function readDraft(body: Record<string, unknown>, isNew: boolean) {
+async function readDraft(body: Record<string, unknown>, isNew: boolean, access: Access) {
   const customerInfo = readContact(body.customerInfo, 'cliente');
   const sellerInfo = readContact(body.sellerInfo, 'vendedor');
   const items = readItems(body.items);
@@ -145,6 +160,25 @@ async function readDraft(body: Record<string, unknown>, isNew: boolean) {
   if (isNew && validUntil < toISODate(new Date())) throw invalid('A validade não pode ser anterior a hoje.');
   const sellerId = await sellerIdByName(sellerInfo.name);
   if (!sellerId) throw invalid('Vendedor não encontrado.');
+  const customerId = await customerIdByName(customerInfo.name);
+  // O vendedor só faz orçamento em nome próprio e para os seus clientes.
+  if (access.role === 'Vendedor') {
+    if (sellerId !== access.sellerId) throw forbidden('O orçamento precisa ficar no seu nome.');
+    if (customerId && onlyOwn(access) && (await customerSellerId(customerId)) !== access.sellerId) {
+      throw forbidden('Este cliente é de outro vendedor.');
+    }
+  }
+  const { total } = quoteTotals(items, discount);
+  if (!can(access, 'exceedDiscount')) {
+    const { quotes: defaults } = await getSettings();
+    if (discountOverLimit(subtotal, subtotal - total, defaults.maxDiscountPercent)) {
+      throw new ApiError(
+        403,
+        'discount_over_limit',
+        `O desconto passa do máximo de ${String(defaults.maxDiscountPercent).replace('.', ',')}%. Peça a um gerente.`,
+      );
+    }
+  }
   return {
     customerInfo,
     sellerInfo,
@@ -153,16 +187,16 @@ async function readDraft(body: Record<string, unknown>, isNew: boolean) {
     validUntil,
     paymentTerms: str(body.paymentTerms, 'A condição de pagamento', { max: 200 }),
     notes: str(body.notes, 'As observações', { max: 2000 }),
-    amount: quoteTotals(items, discount).total,
-    customerId: await customerIdByName(customerInfo.name),
+    amount: total,
+    customerId,
     sellerId,
   };
 }
 
 const CREATION_NOTE = /^(Orçamento criado|Criado a partir do orçamento #\d+)$/;
 
-export async function createQuote(body: Record<string, unknown>): Promise<Quote> {
-  const d = await readDraft(body, true);
+export async function createQuote(body: Record<string, unknown>, access: Access): Promise<Quote> {
+  const d = await readDraft(body, true, access);
   const note = typeof body.note === 'string' && CREATION_NOTE.test(body.note) ? body.note : 'Orçamento criado';
   // O número é o próximo da sequência; se dois saírem juntos, a unicidade barra um e ele tenta de novo.
   for (let attempt = 0; ; attempt++) {
@@ -192,17 +226,22 @@ export async function createQuote(body: Record<string, unknown>): Promise<Quote>
   }
 }
 
-async function currentStatus(id: string): Promise<QuoteStatus> {
-  const [row] = await db()`select status from quotes where id = ${id}`;
+/** Status atual; o vendedor só mexe nos orçamentos dele (mesmo podendo ver os de todos). */
+async function currentStatus(id: string, access: Access): Promise<QuoteStatus> {
+  const [row] = await db()`select status, seller_id::text as seller_id from quotes where id = ${id}`;
   if (!row) throw notFound('Orçamento');
+  if (access.role === 'Vendedor' && row.seller_id !== access.sellerId) {
+    if (onlyOwn(access)) throw notFound('Orçamento');
+    throw forbidden('Este orçamento é de outro vendedor.');
+  }
   return row.status as QuoteStatus;
 }
 
 const NOT_EDITABLE = new ApiError(409, 'quote_not_editable', 'Só orçamentos pendentes podem ser editados. Duplique este orçamento.');
 
-export async function updateQuote(id: string, body: Record<string, unknown>): Promise<Quote> {
-  if ((await currentStatus(id)) !== 'Pendente') throw NOT_EDITABLE;
-  const d = await readDraft(body, false);
+export async function updateQuote(id: string, body: Record<string, unknown>, access: Access): Promise<Quote> {
+  if ((await currentStatus(id, access)) !== 'Pendente') throw NOT_EDITABLE;
+  const d = await readDraft(body, false, access);
   const [row] = await db()`
     with q as (
       update quotes set customer_id = ${d.customerId}, seller_id = ${d.sellerId}, customer_name = ${d.customerInfo.name},
@@ -231,8 +270,8 @@ const TRANSITIONS: Record<QuoteStatus, Partial<Record<QuoteStatus, string>>> = {
   Cancelado: { Pendente: 'Voltou para pendente' },
 };
 
-export async function changeStatus(id: string, body: Record<string, unknown>): Promise<QuoteDetail> {
-  const from = await currentStatus(id);
+export async function changeStatus(id: string, body: Record<string, unknown>, access: Access): Promise<QuoteDetail> {
+  const from = await currentStatus(id, access);
   const to = body.status as QuoteStatus;
   let note = TRANSITIONS[from][to];
   if (!note) throw new ApiError(409, 'invalid_status_transition', `Não é possível passar de ${from} para ${String(to)}.`);
@@ -242,5 +281,5 @@ export async function changeStatus(id: string, body: Record<string, unknown>): P
     e as (insert into quote_events (quote_id, status, note) select id, ${to}, ${note} from q)
     select id from q`;
   if (!rows[0]) throw new ApiError(409, 'invalid_status_transition', 'O orçamento mudou enquanto isso. Recarregue a página.');
-  return getQuote(id);
+  return getQuote(id, access);
 }

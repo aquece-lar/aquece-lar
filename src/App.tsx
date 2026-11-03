@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { RequireAuth } from '@/features/auth/RequireAuth';
+import { RequirePermission } from '@/features/auth/RequirePermission';
 import { CustomersPage } from '@/pages/CustomersPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -33,14 +34,28 @@ const router = createBrowserRouter(
         <Route path="orcamentos/:id/pdf" element={<QuoteDetailPage autoPrint />} />
         <Route path="orcamentos/:id" element={<QuoteDetailPage />} />
         <Route path="orcamentos" element={<QuotesPage />} />
-        <Route path="vendedores" element={<SellersPage />} />
+        <Route
+          path="vendedores"
+          element={
+            <RequirePermission permission="viewSellers">
+              <SellersPage />
+            </RequirePermission>
+          }
+        />
         <Route path="clientes" element={<CustomersPage />} />
         <Route path="produtos" element={<ProductsPage />} />
         <Route path="linhas" element={<PlaceholderPage />} />
         <Route path="fluxogramas" element={<PlaceholderPage />} />
         <Route path="conversas" element={<PlaceholderPage />} />
         <Route path="equivalencias" element={<PlaceholderPage />} />
-        <Route path="configuracoes" element={<SettingsPage />} />
+        <Route
+          path="configuracoes"
+          element={
+            <RequirePermission permission="manageSystem">
+              <SettingsPage />
+            </RequirePermission>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </>,

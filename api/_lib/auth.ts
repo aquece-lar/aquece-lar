@@ -1,6 +1,6 @@
 import { createHash, randomBytes, scrypt, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import type { Session } from '../../src/types/auth';
+import type { Access, Role, Session } from '../../src/types/auth';
 import { db } from './db.js';
 import { ApiError, invalid } from './http.js';
 
@@ -32,6 +32,24 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
 // Hash de uma senha qualquer: e-mail inexistente leva o mesmo tempo que senha errada.
 const DUMMY_HASH = hashPassword(randomBytes(16).toString('hex'));
 
+/** Colunas do usuário com o perfil e o vendedor ligado (`u` = users). */
+export const ACCESS_COLUMNS = `u.role, u.seller_id::text as seller_id, ls.name as seller_name, u.see_all, u.exceed_discount`;
+export const ACCESS_JOIN = `left join sellers ls on ls.id = u.seller_id`;
+
+export function toAccess(row: Record<string, unknown>): Access {
+  return {
+    role: row.role as Role,
+    sellerId: (row.seller_id as string | null) ?? null,
+    sellerName: (row.seller_name as string | null) ?? null,
+    seeAll: row.see_all === true,
+    exceedDiscount: row.exceed_discount === true,
+  };
+}
+
+function toSession(row: Record<string, unknown>): Session {
+  return { email: row.email as string, name: row.name as string, access: toAccess(row) };
+}
+
 function tokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
 }
@@ -57,7 +75,11 @@ export async function login(request: Request, body: Record<string, unknown>): Pr
   const password = typeof body.password === 'string' ? body.password : '';
   if (!email || !password) throw invalid('Informe e-mail e senha.');
 
-  const [user] = await db()`select id::text as id, email, name, password_hash from users where lower(email) = lower(${email})`;
+  const [user] = await db().query(
+    `select u.id::text as id, u.email, u.name, u.password_hash, ${ACCESS_COLUMNS}
+     from users u ${ACCESS_JOIN} where lower(u.email) = lower($1)`,
+    [email],
+  );
   const ok = await verifyPassword(password, (user?.password_hash as string | undefined) ?? (await DUMMY_HASH));
   if (!user || !ok) throw new ApiError(401, 'invalid_credentials', 'E-mail ou senha incorretos.');
 
@@ -72,7 +94,7 @@ export async function login(request: Request, body: Record<string, unknown>): Pr
   await db()`delete from sessions where expires_at < now()`;
 
   return {
-    session: { email: user.email as string, name: user.name as string },
+    session: toSession(user),
     setCookie: cookie(token, remember ? seconds : null, request),
   };
 }
@@ -82,18 +104,25 @@ export interface Caller {
   id: string;
   tokenHash: string;
   session: Session;
+  access: Access;
 }
+
+export const forbidden = (message = 'Seu perfil não tem permissão para isso.') => new ApiError(403, 'forbidden', message);
 
 /** Usuário da sessão do cookie; sem sessão válida, 401. */
 export async function caller(request: Request): Promise<Caller> {
   const token = readToken(request);
   if (!token) throw unauthorized();
   const hash = tokenHash(token);
-  const [row] = await db()`
-    select u.id::text as id, u.email, u.name from sessions s join users u on u.id = s.user_id
-    where s.token_hash = ${hash} and s.expires_at > now()`;
+  const [row] = await db().query(
+    `select u.id::text as id, u.email, u.name, ${ACCESS_COLUMNS}
+     from sessions s join users u on u.id = s.user_id ${ACCESS_JOIN}
+     where s.token_hash = $1 and s.expires_at > now()`,
+    [hash],
+  );
   if (!row) throw unauthorized();
-  return { id: row.id as string, tokenHash: hash, session: { email: row.email as string, name: row.name as string } };
+  const session = toSession(row);
+  return { id: row.id as string, tokenHash: hash, session, access: session.access };
 }
 
 export async function currentUser(request: Request): Promise<Session> {

@@ -6,7 +6,8 @@ interface RowMenuProps {
   /** Nome do item, usado no rótulo acessível do botão. */
   label: string;
   onEdit: () => void;
-  onDelete: () => void;
+  /** Sem `onDelete` (perfil sem permissão), o menu só tem Editar. */
+  onDelete?: () => void;
 }
 
 /**
@@ -81,15 +82,17 @@ export function RowMenu({ label, onEdit, onDelete }: RowMenuProps) {
             <Icon name="edit" size={16} />
             Editar
           </button>
-          <button
-            type="button"
-            role="menuitem"
-            className={`${styles.item} ${styles.danger}`}
-            onClick={() => choose(onDelete)}
-          >
-            <Icon name="trash" size={16} />
-            Excluir
-          </button>
+          {onDelete && (
+            <button
+              type="button"
+              role="menuitem"
+              className={`${styles.item} ${styles.danger}`}
+              onClick={() => choose(onDelete)}
+            >
+              <Icon name="trash" size={16} />
+              Excluir
+            </button>
+          )}
         </div>
       )}
     </>

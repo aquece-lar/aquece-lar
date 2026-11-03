@@ -25,8 +25,8 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 
 | Função no front | Endpoint sugerido | Telas |
 |---|---|---|
-| `login(email, password, remember)` | `POST /auth/login` → `{ email, name }` + cookie de sessão HttpOnly; credenciais erradas: 401 `invalid_credentials`. `GET /auth/me` → `{ email, name }`; `POST /auth/logout` → 204. Sem sessão, as outras rotas respondem 401 `unauthorized` | Login |
-| `listUsers()`, `createUser(draft)`, `updateUser(id, draft)`, `deleteUser(id)` | `GET /users` → `[{ id, name, email, createdAt, lastLoginAt, isCurrent }]`; `POST /users` `{ name, email, password }`; `PUT /users/:id` (senha vazia mantém a atual; senha nova derruba as outras sessões); `DELETE /users/:id`. E-mail repetido: 409 `duplicate_email`; excluir a si mesmo: 409 `cannot_delete_self` | Configurações → Usuários |
+| `login(email, password, remember)` | `POST /auth/login` → `{ email, name, access }` + cookie de sessão HttpOnly; credenciais erradas: 401 `invalid_credentials`. `GET /auth/me` → `{ email, name, access }` (veja [Perfis e permissões](#perfis-e-permissões)); `POST /auth/logout` → 204. Sem sessão, as outras rotas respondem 401 `unauthorized` | Login |
+| `listUsers()`, `createUser(draft)`, `updateUser(id, draft)`, `deleteUser(id)` | Só administrador (senão 403 `forbidden`). `GET /users` → `[{ id, name, email, createdAt, lastLoginAt, isCurrent, role, sellerId, sellerName, seeAll, exceedDiscount }]`; `POST /users` `{ name, email, password, role, sellerId, seeAll, exceedDiscount }`; `PUT /users/:id` (senha vazia mantém a atual; senha nova derruba as outras sessões); `DELETE /users/:id`. E-mail repetido: 409 `duplicate_email`; excluir a si mesmo: 409 `cannot_delete_self`; mudar o próprio perfil: 409 `cannot_change_own_role`; tirar o último administrador: 409 `last_admin` | Configurações → Usuários |
 | `getDashboard(period)` | `GET /dashboard?from=&to=` | Dashboard |
 | `listQuotes(period)` | `GET /quotes?from=&to=` | Lista de orçamentos |
 | `getQuote(id)` | `GET /quotes/:id` | Detalhe, editar, duplicar |
@@ -39,6 +39,37 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 | `getSettings()` / `saveSettings(settings)` | `GET` / `PUT /settings` | Configurações, orçamento, PDF |
 
 `save*` hoje cria ou atualiza conforme o id já existir. Na API: `POST` cria (sem id, devolve o registro com id), `PUT /:id` atualiza.
+
+---
+
+## Perfis e permissões
+
+Cada usuário tem um perfil. As regras ficam em `src/lib/access.ts`, usadas pela API (que confere em cada rota) e pelo front (que esconde menus e botões).
+
+```ts
+interface Access {
+  role: 'Administrador' | 'Gerente' | 'Vendedor';
+  sellerId: string | null;   // cadastro de vendedor ligado; obrigatório no perfil Vendedor
+  sellerName: string | null;
+  seeAll: boolean;           // vendedor: vê orçamentos, clientes e dashboard de todos
+  exceedDiscount: boolean;   // vendedor: salva desconto acima de maxDiscountPercent
+}
+```
+
+| | Administrador | Gerente | Vendedor |
+|---|---|---|---|
+| Orçamentos (`/quotes`) | todos | todos | só os dele; com `seeAll`, vê todos mas só edita e muda status dos dele |
+| Criar orçamento | qualquer vendedor | qualquer vendedor | só no próprio nome (403 `forbidden`) |
+| Desconto acima do máximo | sim | sim | só com `exceedDiscount` (403 `discount_over_limit`) |
+| Clientes (`/customers`) | todos | todos | só os dele (com `seeAll`, todos); cadastra sempre no próprio nome e só edita os dele; não exclui |
+| Vendedores e produtos | edita | edita | só consulta (`GET /sellers` devolve só o próprio cadastro, se não tiver `seeAll`) |
+| Dashboard | geral | geral | só os números dele (com `seeAll`, geral) |
+| `PUT /settings` e `/users` | sim | 403 | 403 |
+
+- Sem permissão: 403 `forbidden`. Orçamento de outro vendedor, para quem só vê os seus, responde 404 (como se não existisse).
+- `GET /settings` continua aberto a todos: o formulário de orçamento usa os padrões.
+- Usuários que já existiam viraram administradores na migração, para ninguém perder acesso. Sempre sobra ao menos um administrador, e ninguém muda o próprio perfil.
+- Nos dados fictícios há uma conta por perfil (`src/services/mocks/authMock.ts`).
 
 ---
 
@@ -301,10 +332,10 @@ Regras:
 - Um orçamento novo começa com `validUntil` = hoje + `validDays`, a primeira condição e as observações daqui. Orçamentos já criados guardam os próprios textos e não mudam quando as configurações mudam.
 - O desconto sugerido vem do texto da condição ("… 5% de desconto"); a API não precisa interpretar.
 - `company` aparece no cabeçalho do PDF (campos vazios são omitidos) e `footer` no fim da folha.
-- `maxDiscountPercent`: o desconto do orçamento é comparado em % do subtotal (mesmo quando digitado em R$). Acima do limite, o front pede confirmação e salva se o usuário confirmar; a API não recusa. Com login, dá para exigir um perfil de gerente para passar do limite.
+- `maxDiscountPercent`: o desconto do orçamento é comparado em % do subtotal (mesmo quando digitado em R$). Acima do limite, administrador e gerente confirmam e salvam; o vendedor só salva com a permissão `exceedDiscount`, senão a API recusa com 403 `discount_over_limit`.
 - `expiryAlertDays`: veja "Validade e vencimento" em Orçamentos.
 - `logo`: assim como as fotos de produto, o ideal é um upload (`POST /settings/logo`) que devolve a URL, guardada em `logo`.
-- Antes do login, qualquer um pode alterar; com perfis, só administradores deveriam poder fazer o `PUT`.
+- Só administrador faz o `PUT` (403 `forbidden` para os outros perfis).
 
 ---
 
@@ -322,7 +353,7 @@ Coisas que o front faz hoje porque não há backend, e que devem mudar quando a 
 | Total calculado no front e enviado pronto | API recalcula com a regra acima e ignora o valor enviado | Nenhum |
 | PDF gerado pela impressão do navegador | Pode continuar assim; se o WhatsApp precisar anexar o PDF, gerar no servidor | Nenhum por enquanto |
 | Excluir vendedor ou produto não confere se está em uso | Bloquear (409) ou sugerir inativar quando houver orçamentos ou clientes ligados | Pequeno: tratar a mensagem |
-| ~~Login conferido no navegador contra uma conta fixa~~ | Feito: a API confere a senha (hash scrypt) e a sessão vai num cookie HttpOnly; todas as rotas exigem sessão | Feito. Falta definir perfis (hoje todos têm acesso total) |
+| ~~Login conferido no navegador contra uma conta fixa~~ | Feito: a API confere a senha (hash scrypt) e a sessão vai num cookie HttpOnly; todas as rotas exigem sessão | Feito, com perfis: veja [Perfis e permissões](#perfis-e-permissões) |
 | Lista de orçamentos sem paginação na API | Ok para o volume atual; paginar no servidor se crescer | Médio, só se for paginar |
 
 ## Como o front vai trocar

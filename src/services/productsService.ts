@@ -1,6 +1,7 @@
 import type { Product } from '@/types/products';
 import { api, ApiError, isSavedId, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
+import { mockEnsure } from './mockSession';
 import { PRODUCTS_MOCK } from './mocks/productsMock';
 
 /** Modo fictício (testes): cópia em memória do cadastro, até recarregar a página. */
@@ -43,6 +44,7 @@ export async function saveProduct(product: Product): Promise<Product> {
     }
   }
   return fromMock(() => {
+    mockEnsure('manageCatalog');
     if (products.some((p) => p.id !== product.id && sameCode(p.code, product.code))) {
       throw new DuplicateProductCodeError(product.code);
     }
@@ -58,6 +60,7 @@ export async function saveProduct(product: Product): Promise<Product> {
 export function deleteProduct(id: string): Promise<void> {
   if (!USE_MOCKS) return api<void>('DELETE', `/products/${id}`);
   return fromMock(() => {
+    mockEnsure('manageCatalog');
     products = products.filter((p) => p.id !== id);
   });
 }

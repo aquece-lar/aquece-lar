@@ -1,7 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { can, FULL_ACCESS, type Permission } from '@/lib/access';
 import { currentSession, login as authenticate, logout as endSession } from '@/services/authService';
 import { SESSION_EXPIRED_EVENT } from '@/services/http';
-import type { Session } from '@/types/auth';
+import type { Access, Session } from '@/types/auth';
 
 interface AuthContextValue {
   /** `undefined` enquanto confere se já há sessão. */
@@ -68,6 +69,16 @@ export function useUserName(): { name: string; initials: string } {
   const words = name.trim().split(/\s+/);
   const initials = (words.length > 1 ? words[0]![0]! + words[words.length - 1]![0]! : name.slice(0, 2)).toUpperCase();
   return { name, initials };
+}
+
+/** Perfil de quem está conectado; fora do AuthProvider (testes de tela), acesso total. */
+export function useAccess(): Access {
+  return useContext(AuthContext)?.session?.access ?? FULL_ACCESS;
+}
+
+/** Atalho para esconder menus e botões que o perfil não pode usar (a API confere de novo). */
+export function useCan(permission: Permission): boolean {
+  return can(useAccess(), permission);
 }
 
 /** `refresh` do AuthContext; fora do AuthProvider (testes de tela), não faz nada. */

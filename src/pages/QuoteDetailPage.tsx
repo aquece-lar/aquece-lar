@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
+import { useAccess } from '@/contexts/AuthContext';
 import { QuoteStatusBadge } from '@/features/dashboard/QuoteStatusBadge';
 import { Modal } from '@/features/people/Modal';
 import { useQuote } from '@/features/quotes/useQuote';
@@ -97,6 +98,7 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
   const [reloadKey, setReloadKey] = useState(0);
   const state = useQuote(id, reloadKey);
   const settings = useSettings();
+  const access = useAccess();
   const [confirming, setConfirming] = useState<StatusAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -164,6 +166,8 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
 
   const itemCount = quote.items.reduce((sum, item) => sum + item.quantity, 0);
   const totals = quoteTotals(quote.items, quote.discount);
+  // Vendedor que vê os de todos só mexe nos próprios; nos outros, pode abrir e duplicar.
+  const mine = access.role !== 'Vendedor' || quote.seller === access.sellerName;
 
   return (
     <>
@@ -190,7 +194,7 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
           </p>
         </div>
         <div className={styles.actions} data-no-print>
-          {quote.status === 'Pendente' && (
+          {mine && quote.status === 'Pendente' && (
             <Link to={`/orcamentos/${quote.id}/editar`} className="btn btn-secondary">
               <Icon name="edit" size={16} />
               Editar
@@ -204,7 +208,7 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
             <Icon name="download" size={16} />
             Baixar PDF
           </button>
-          {ACTIONS[quote.status].map((action) => (
+          {(mine ? ACTIONS[quote.status] : []).map((action) => (
             <button
               key={action.to}
               type="button"

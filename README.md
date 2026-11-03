@@ -37,6 +37,8 @@ npm run user:save -- email@exemplo.com "Nome da Pessoa"   # cria, ou troca a sen
 npm run user:save -- email@exemplo.com --remove           # remove
 ```
 
+Quem é criado pelo terminal entra como administrador; o perfil se troca em Configurações → Usuários.
+
 Outros scripts:
 
 ```bash
@@ -66,7 +68,8 @@ prototipo/        mockup HTML original (referência visual)
 
 ## Comportamento atual
 
-- Login obrigatório para todas as telas, com e-mail e senha dos usuários do banco (`npm run user:save`). A sessão é um cookie HttpOnly: com "Manter conectado" dura 30 dias; sem ele, acaba ao fechar o navegador (e no máximo em 12 h). O botão Sair fica no rodapé do menu. Nos dados fictícios, a conta é `admin@aquecelar.com.br` / `admin@adm` (`src/services/mocks/authMock.ts`)
+- Login obrigatório para todas as telas, com e-mail e senha dos usuários do banco (`npm run user:save`). A sessão é um cookie HttpOnly: com "Manter conectado" dura 30 dias; sem ele, acaba ao fechar o navegador (e no máximo em 12 h). O botão Sair fica no rodapé do menu. Nos dados fictícios há uma conta por perfil: `admin@aquecelar.com.br` / `admin@adm`, `gerente@aquecelar.com.br` / `gerente@adm` e o vendedor `carlos.menezes@aquecelar.com.br` / `vendedor@1` (`src/services/mocks/authMock.ts`)
+- Perfis: administrador (tudo), gerente (tudo menos usuários e configurações) e vendedor (os próprios orçamentos e clientes, sem passar do desconto máximo). Para cada vendedor dá para liberar "ver de todos" e "passar do desconto máximo" em Configurações → Usuários. As regras ficam em `src/lib/access.ts`, e a API confere em cada rota
 - Dashboard com período filtrável, KPIs, gráfico diário (quantidade/valor), ranking com a meta de cada vendedor (proporcional ao período), orçamentos vencendo e últimos orçamentos, tudo calculado a partir dos orçamentos (um orçamento novo aparece na hora)
 - Sidebar recolhível no desktop e gaveta no mobile
 - Tema claro/escuro persistido em `localStorage`
@@ -83,6 +86,6 @@ Cadastros, configurações, edições, mudanças de status e orçamentos novos f
 
 `api/index.ts` é a única função da Vercel: o `vercel.json` manda `/api/<caminho>` para ela e `api/_lib/router.ts` atende as rotas de [docs/api-contrato.md](docs/api-contrato.md) (vendedores, clientes, produtos, orçamentos, status, configurações e dashboard). As regras de cálculo (total, períodos, vencimento, dashboard) são as mesmas do front, em `src/lib/`; por isso esses arquivos importam uns aos outros com caminho relativo e `.js`, que é o que a função da Vercel entende.
 
-Login: `POST /api/auth/login` confere a senha (hash scrypt na tabela `users`) e devolve um cookie HttpOnly com a sessão (só o hash do token fica na tabela `sessions`); `GET /api/auth/me` diz quem está conectado e `POST /api/auth/logout` encerra. Fora `/api/health` e essas, toda rota responde 401 sem sessão válida, e o front volta para a tela de login. Por enquanto todos os usuários têm acesso total.
+Login: `POST /api/auth/login` confere a senha (hash scrypt na tabela `users`) e devolve um cookie HttpOnly com a sessão (só o hash do token fica na tabela `sessions`); `GET /api/auth/me` diz quem está conectado e `POST /api/auth/logout` encerra. Fora `/api/health` e essas, toda rota responde 401 sem sessão válida, e o front volta para a tela de login. Cada usuário tem um perfil (colunas `role`, `seller_id`, `see_all` e `exceed_discount` na tabela `users`; quem já existia virou administrador). Sem permissão, a rota responde 403.
 
 O backend em PHP (`backend/`) foi a primeira versão da API, para MySQL; a Vercel não roda PHP, então ele não é usado.

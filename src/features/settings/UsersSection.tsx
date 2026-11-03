@@ -6,6 +6,7 @@ import { Modal } from '@/features/people/Modal';
 import { RowMenu } from '@/features/people/RowMenu';
 import { useList } from '@/features/people/useList';
 import { formatDateTime, initials } from '@/lib/format';
+import { listSellers } from '@/services/peopleService';
 import { createUser, deleteUser, listUsers, updateUser } from '@/services/usersService';
 import type { User, UserDraft } from '@/types/users';
 import { UserForm } from './UserForm';
@@ -16,6 +17,7 @@ export function UsersSection() {
   const refresh = useRefreshSession();
   const [reloadKey, setReloadKey] = useState(0);
   const state = useList(listUsers, 'Não foi possível carregar os usuários.', reloadKey);
+  const sellersState = useList(listSellers, 'Não foi possível carregar os vendedores.', reloadKey);
 
   /** `{}` = novo; `{ item }` = edição; `null` = fechado. */
   const [form, setForm] = useState<{ item?: User } | null>(null);
@@ -37,7 +39,7 @@ export function UsersSection() {
       else await createUser(draft);
       setForm(null);
       setReloadKey((k) => k + 1);
-      // O próprio nome aparece no menu e no topo.
+      // O próprio nome e o perfil aparecem no menu e no topo.
       if (editing?.isCurrent) await refresh();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o usuário.');
@@ -67,7 +69,7 @@ export function UsersSection() {
           <h2 id="usuarios-titulo" className={styles.title}>
             Usuários
           </h2>
-          <p className={styles.hint}>Quem pode entrar no sistema, com e-mail e senha. Todos têm acesso total.</p>
+          <p className={styles.hint}>Quem pode entrar no sistema, com e-mail, senha e perfil.</p>
         </div>
         <button type="button" className="btn btn-secondary" onClick={() => openForm({})}>
           <Icon name="plus" size={16} />
@@ -100,6 +102,16 @@ export function UsersSection() {
                 </span>
                 <span className={styles.detail}>{user.email}</span>
               </span>
+              <span className={styles.role}>
+                <span className={styles.roleName}>{user.role}</span>
+                {user.role === 'Vendedor' && (
+                  <span className={styles.detail}>
+                    {user.sellerName ?? 'Sem vendedor ligado'}
+                    {user.seeAll ? ' · vê todos' : ''}
+                    {user.exceedDiscount ? ' · passa do desconto' : ''}
+                  </span>
+                )}
+              </span>
               <span className={styles.access}>
                 {user.lastLoginAt ? `Último acesso ${formatDateTime(user.lastLoginAt)}` : 'Nunca entrou'}
               </span>
@@ -113,6 +125,7 @@ export function UsersSection() {
         <UserForm
           key={form?.item?.id ?? 'novo'}
           initial={form?.item}
+          sellers={sellersState.data ?? []}
           busy={busy}
           error={formError}
           onSubmit={handleSave}

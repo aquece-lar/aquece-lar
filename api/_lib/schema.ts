@@ -88,4 +88,10 @@ export const SCHEMA: string[] = [
     created_at timestamptz not null default now()
   )`,
   `create index if not exists sessions_user_idx on sessions (user_id)`,
+  // Perfis (src/lib/access.ts). Quem já existia vira administrador, para ninguém perder acesso.
+  `alter table users add column if not exists role text not null default 'Administrador'
+    check (role in ('Administrador', 'Gerente', 'Vendedor'))`,
+  `alter table users add column if not exists seller_id bigint references sellers (id) on delete set null`,
+  `alter table users add column if not exists see_all boolean not null default false`,
+  `alter table users add column if not exists exceed_discount boolean not null default false`,
 ];

@@ -1,7 +1,8 @@
 import type { Customer, Seller } from '@/types/people';
 import type { Quote } from '@/types/quotes';
-import { api, isSavedId, USE_MOCKS } from './http';
+import { api, ApiError, isSavedId, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
+import { mockAccess, mockEnsure, mockOwnSeller } from './mockSession';
 import { CUSTOMERS_MOCK, SELLERS_MOCK } from './mocks/peopleMock';
 import { quotesSnapshot } from './quotesService';
 
@@ -40,7 +41,11 @@ function withQuoteStats(customer: Customer, quotes: readonly Quote[]): Customer 
 
 export function listSellers(signal?: AbortSignal): Promise<Seller[]> {
   if (!USE_MOCKS) return api<Seller[]>('GET', '/sellers', undefined, signal);
-  return fromMock(() => sellers.map((s) => withMonthStats(s, quotesSnapshot())), signal);
+  return fromMock(() => {
+    // Vendedor que só vê o que é dele recebe só o próprio cadastro, como na API.
+    const own = mockOwnSeller();
+    return sellers.filter((s) => own === null || s.name === own).map((s) => withMonthStats(s, quotesSnapshot()));
+  }, signal);
 }
 
 export function saveSeller(seller: Seller): Promise<Seller> {
@@ -50,6 +55,7 @@ export function saveSeller(seller: Seller): Promise<Seller> {
     return isSavedId(id) ? api<Seller>('PUT', `/sellers/${id}`, body) : api<Seller>('POST', '/sellers', body);
   }
   return fromMock(() => {
+    mockEnsure('manageCatalog');
     sellers = upsert(sellers, seller);
     return seller;
   });
@@ -58,13 +64,17 @@ export function saveSeller(seller: Seller): Promise<Seller> {
 export function deleteSeller(id: string): Promise<void> {
   if (!USE_MOCKS) return api<void>('DELETE', `/sellers/${id}`);
   return fromMock(() => {
+    mockEnsure('manageCatalog');
     sellers = sellers.filter((s) => s.id !== id);
   });
 }
 
 export function listCustomers(signal?: AbortSignal): Promise<Customer[]> {
   if (!USE_MOCKS) return api<Customer[]>('GET', '/customers', undefined, signal);
-  return fromMock(() => customers.map((c) => withQuoteStats(c, quotesSnapshot())), signal);
+  return fromMock(() => {
+    const own = mockOwnSeller();
+    return customers.filter((c) => own === null || c.seller === own).map((c) => withQuoteStats(c, quotesSnapshot()));
+  }, signal);
 }
 
 export function saveCustomer(customer: Customer): Promise<Customer> {
@@ -74,14 +84,25 @@ export function saveCustomer(customer: Customer): Promise<Customer> {
     return isSavedId(id) ? api<Customer>('PUT', `/customers/${id}`, body) : api<Customer>('POST', '/customers', body);
   }
   return fromMock(() => {
-    customers = upsert(customers, customer);
-    return customer;
+    // O vendedor cadastra no próprio nome e só edita os clientes dele (como em api/_lib/customers.ts).
+    const access = mockAccess();
+    let saved = customer;
+    if (access.role === 'Vendedor') {
+      const current = customers.find((c) => c.id === customer.id);
+      if (current && current.seller !== access.sellerName) {
+        throw new ApiError(403, 'forbidden', 'Este cliente é de outro vendedor.');
+      }
+      saved = { ...customer, seller: access.sellerName ?? '' };
+    }
+    customers = upsert(customers, saved);
+    return saved;
   });
 }
 
 export function deleteCustomer(id: string): Promise<void> {
   if (!USE_MOCKS) return api<void>('DELETE', `/customers/${id}`);
   return fromMock(() => {
+    mockEnsure('deleteRecords');
     customers = customers.filter((c) => c.id !== id);
   });
 }

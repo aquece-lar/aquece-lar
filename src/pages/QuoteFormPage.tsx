@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
+import { useAccess } from '@/contexts/AuthContext';
+import { can } from '@/lib/access';
 import { termDiscount } from '@/config/quotes';
 import { CustomerForm, type CustomerDraft } from '@/features/people/CustomerForm';
 import { Modal } from '@/features/people/Modal';
@@ -121,23 +123,31 @@ interface PickerCardProps {
   error?: string;
   onChange: (id: string) => void;
   onCreate?: (text: string) => void;
+  /** Só mostra o escolhido, sem deixar trocar (vendedor: o orçamento é sempre dele). */
+  locked?: boolean;
 }
 
-function PickerCard({ id, title, placeholder, value, options, contact, error, onChange, onCreate }: PickerCardProps) {
+function PickerCard({ id, title, placeholder, value, options, contact, error, onChange, onCreate, locked }: PickerCardProps) {
   return (
     <section className={`card ${detailStyles.side}`}>
-      <label htmlFor={id} className={detailStyles.sideTitle}>
-        {title} *
-      </label>
-      <Combobox
-        id={id}
-        options={options}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        invalid={Boolean(error)}
-        onCreate={onCreate}
-      />
+      {locked ? (
+        <h2 className={detailStyles.sideTitle}>{title}</h2>
+      ) : (
+        <>
+          <label htmlFor={id} className={detailStyles.sideTitle}>
+            {title} *
+          </label>
+          <Combobox
+            id={id}
+            options={options}
+            value={value}
+            onChange={onChange}
+            placeholder={placeholder}
+            invalid={Boolean(error)}
+            onCreate={onCreate}
+          />
+        </>
+      )}
       {error && <p className={formStyles.error}>{error}</p>}
       {contact && (
         <>
@@ -198,7 +208,13 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
 
   // Cliente e vendedor do orçamento-base são achados pelo nome; se não existirem mais, ficam em branco.
   const [customerId, setCustomerId] = useState(() => customers.find((c) => c.name === base?.customer)?.id ?? '');
-  const [sellerId, setSellerId] = useState(() => sellers.find((s) => s.name === base?.seller)?.id ?? '');
+  // Vendedor: o orçamento fica sempre no nome dele, mesmo ao duplicar o de outro.
+  const access = useAccess();
+  const lockedSellerId = access.role === 'Vendedor' ? access.sellerId : null;
+  const canExceedDiscount = can(access, 'exceedDiscount');
+  const [sellerId, setSellerId] = useState(
+    () => lockedSellerId ?? sellers.find((s) => s.name === base?.seller)?.id ?? '',
+  );
   const [lines, setLines] = useState<Line[]>(() =>
     base
       ? base.items.map((item, key) => ({
@@ -388,6 +404,9 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
       if (Object.keys(lineError).length > 0) lineErrors[line.key] = lineError;
     }
     if (Object.keys(lineErrors).length > 0) found.lines = lineErrors;
+    if (!found.discount && overLimit && !canExceedDiscount) {
+      found.discount = `Acima do máximo de ${maxDiscount?.toLocaleString('pt-BR')}%. Peça a um gerente para liberar.`;
+    }
     setErrors(found);
     if (Object.keys(found).length > 0 || !customerContact || !sellerContact) return;
     if (overLimit && !allowOverLimit) {
@@ -597,9 +616,10 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
                 <p className={`${formStyles.error} ${styles.summaryError}`}>{errors.discount}</p>
               ) : (
                 overLimit && (
-                  <p className={styles.summaryWarn}>
+                  <p className={canExceedDiscount ? styles.summaryWarn : `${formStyles.error} ${styles.summaryError}`}>
                     Desconto de {discountPercent.toLocaleString('pt-BR')}%, acima do limite de{' '}
                     {maxDiscount?.toLocaleString('pt-BR')}% definido nas configurações.
+                    {!canExceedDiscount && ' Só um gerente pode liberar.'}
                   </p>
                 )
               )}
@@ -673,6 +693,7 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
             contact={sellerContact}
             error={errors.seller}
             onChange={setSellerId}
+            locked={lockedSellerId !== null}
           />
         </div>
       </form>
@@ -682,6 +703,7 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
           <CustomerForm
             initial={{ name: newCustomerName, seller: seller?.name ?? '' }}
             sellers={sellers.map((s) => s.name)}
+            lockedSeller={lockedSellerId !== null ? (access.sellerName ?? '') : undefined}
             busy={savingCustomer}
             error={customerError}
             onSubmit={saveNewCustomer}

@@ -24,6 +24,8 @@ interface CustomerFormProps {
   /** Cliente em edição, ou só alguns campos já sabidos num cadastro novo (ex.: o nome digitado). */
   initial?: Partial<CustomerDraft>;
   sellers: string[];
+  /** Perfil Vendedor: o cliente fica sempre no nome dele (a API também força). */
+  lockedSeller?: string;
   busy: boolean;
   /** Erro ao salvar (ex.: recusado pela API). */
   error?: string;
@@ -31,8 +33,12 @@ interface CustomerFormProps {
   onCancel: () => void;
 }
 
-export function CustomerForm({ initial, sellers, busy, error, onSubmit, onCancel }: CustomerFormProps) {
-  const [draft, setDraft] = useState<CustomerDraft>({ ...EMPTY, ...initial });
+export function CustomerForm({ initial, sellers, lockedSeller, busy, error, onSubmit, onCancel }: CustomerFormProps) {
+  const [draft, setDraft] = useState<CustomerDraft>({
+    ...EMPTY,
+    ...initial,
+    ...(lockedSeller === undefined ? {} : { seller: lockedSeller }),
+  });
   const [errors, setErrors] = useState<Errors>({});
   // Mantém o vendedor atual na lista mesmo que ele tenha sido excluído.
   const sellerOptions = draft.seller && !sellers.includes(draft.seller) ? [draft.seller, ...sellers] : sellers;
@@ -113,6 +119,7 @@ export function CustomerForm({ initial, sellers, busy, error, onSubmit, onCancel
             value={draft.seller}
             options={[{ value: '', label: 'Sem vendedor' }, ...sellerOptions.map((name) => ({ value: name, label: name }))]}
             onChange={(value) => set('seller', value)}
+            disabled={lockedSeller !== undefined}
           />
         </div>
       </div>

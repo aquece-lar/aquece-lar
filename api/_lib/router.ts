@@ -1,4 +1,6 @@
-import { caller, currentUser, login, logout } from './auth.js';
+import type { Access } from '../../src/types/auth';
+import { can, type Permission } from '../../src/lib/access.js';
+import { caller, currentUser, forbidden, login, logout } from './auth.js';
 import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
 import { getDashboard } from './dashboard.js';
 import { db } from './db.js';
@@ -9,18 +11,46 @@ import { createSeller, deleteSeller, listSellers, updateSeller } from './sellers
 import { getSettings, saveSettings } from './settings.js';
 import { createUser, deleteUser, listUsers, updateUser } from './users.js';
 
+/** `write`/`remove`: permissão para criar e editar / excluir; sem ela, 403. Ler é livre (o filtro fica em `list`). */
 type Crud = {
-  list: () => Promise<unknown>;
-  create: (body: Record<string, unknown>) => Promise<unknown>;
-  update: (id: string, body: Record<string, unknown>) => Promise<unknown>;
+  list: (access: Access) => Promise<unknown>;
+  create: (body: Record<string, unknown>, access: Access) => Promise<unknown>;
+  update: (id: string, body: Record<string, unknown>, access: Access) => Promise<unknown>;
   remove: (id: string) => Promise<void>;
+  write?: Permission;
+  removal: Permission;
 };
 
 const CRUD: Record<string, Crud> = {
-  sellers: { list: listSellers, create: createSeller, update: updateSeller, remove: deleteSeller },
-  customers: { list: listCustomers, create: createCustomer, update: updateCustomer, remove: deleteCustomer },
-  products: { list: listProducts, create: createProduct, update: updateProduct, remove: deleteProduct },
+  sellers: {
+    list: listSellers,
+    create: createSeller,
+    update: updateSeller,
+    remove: deleteSeller,
+    write: 'manageCatalog',
+    removal: 'manageCatalog',
+  },
+  // O vendedor cadastra e edita os próprios clientes (a regra fica em customers.ts), mas não exclui.
+  customers: {
+    list: listCustomers,
+    create: createCustomer,
+    update: updateCustomer,
+    remove: deleteCustomer,
+    removal: 'deleteRecords',
+  },
+  products: {
+    list: listProducts,
+    create: createProduct,
+    update: updateProduct,
+    remove: deleteProduct,
+    write: 'manageCatalog',
+    removal: 'manageCatalog',
+  },
 };
+
+function ensure(access: Access, permission: Permission | undefined): void {
+  if (permission && !can(access, permission)) throw forbidden();
+}
 
 const METHOD_NOT_ALLOWED = new ApiError(405, 'method_not_allowed', 'Método não permitido.');
 
@@ -61,32 +91,36 @@ export async function handle(request: Request, path: string): Promise<Response> 
 
     if (resource === 'dashboard' && !id) {
       if (method !== 'GET') throw METHOD_NOT_ALLOWED;
-      return json(await getDashboard(period(url)));
+      return json(await getDashboard(period(url), me.access));
     }
 
     if (resource === 'settings' && !id) {
       if (method === 'GET') return json(await getSettings());
-      if (method === 'PUT') return json(await saveSettings(await readBody(request)));
+      if (method === 'PUT') {
+        ensure(me.access, 'manageSystem');
+        return json(await saveSettings(await readBody(request)));
+      }
       throw METHOD_NOT_ALLOWED;
     }
 
     if (resource === 'quotes') {
       if (!id) {
-        if (method === 'GET') return json(await listQuotes(period(url)));
-        if (method === 'POST') return json(await createQuote(await readBody(request)), 201);
+        if (method === 'GET') return json(await listQuotes(period(url), me.access));
+        if (method === 'POST') return json(await createQuote(await readBody(request), me.access), 201);
         throw METHOD_NOT_ALLOWED;
       }
       if (action === 'status') {
         if (method !== 'POST') throw METHOD_NOT_ALLOWED;
-        return json(await changeStatus(id, await readBody(request)));
+        return json(await changeStatus(id, await readBody(request), me.access));
       }
       if (action) throw new ApiError(404, 'not_found', 'Rota não encontrada.');
-      if (method === 'GET') return json(await getQuote(id));
-      if (method === 'PUT') return json(await updateQuote(id, await readBody(request)));
+      if (method === 'GET') return json(await getQuote(id, me.access));
+      if (method === 'PUT') return json(await updateQuote(id, await readBody(request), me.access));
       throw METHOD_NOT_ALLOWED;
     }
 
     if (resource === 'users' && !action) {
+      ensure(me.access, 'manageSystem');
       if (!id) {
         if (method === 'GET') return json(await listUsers(me));
         if (method === 'POST') return json(await createUser(await readBody(request), me), 201);
@@ -103,12 +137,19 @@ export async function handle(request: Request, path: string): Promise<Response> 
     const crud = CRUD[resource];
     if (crud && !action) {
       if (!id) {
-        if (method === 'GET') return json(await crud.list());
-        if (method === 'POST') return json(await crud.create(await readBody(request)), 201);
+        if (method === 'GET') return json(await crud.list(me.access));
+        if (method === 'POST') {
+          ensure(me.access, crud.write);
+          return json(await crud.create(await readBody(request), me.access), 201);
+        }
         throw METHOD_NOT_ALLOWED;
       }
-      if (method === 'PUT') return json(await crud.update(id, await readBody(request)));
+      if (method === 'PUT') {
+        ensure(me.access, crud.write);
+        return json(await crud.update(id, await readBody(request), me.access));
+      }
       if (method === 'DELETE') {
+        ensure(me.access, crud.removal);
         await crud.remove(id);
         return noContent();
       }

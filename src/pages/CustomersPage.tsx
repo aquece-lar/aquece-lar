@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { useAccess } from '@/contexts/AuthContext';
 import { ConfirmDelete } from '@/features/people/ConfirmDelete';
 import { CustomerForm, type CustomerDraft } from '@/features/people/CustomerForm';
 import { ListToolbar } from '@/features/people/ListToolbar';
 import { Modal } from '@/features/people/Modal';
 import { RowMenu } from '@/features/people/RowMenu';
 import { matches, useList } from '@/features/people/useList';
+import { can } from '@/lib/access';
 import { formatDateTime, initials } from '@/lib/format';
 import { deleteCustomer, listCustomers, listSellers, newId, saveCustomer } from '@/services/peopleService';
 import type { Customer, CustomerKind } from '@/types/people';
@@ -52,6 +54,11 @@ export function CustomersPage() {
       ),
     [all, filter, query],
   );
+  // O vendedor cadastra no próprio nome, só edita os clientes dele e não exclui.
+  const access = useAccess();
+  const lockedSeller = access.role === 'Vendedor' ? (access.sellerName ?? '') : undefined;
+  const canDelete = can(access, 'deleteRecords');
+  const canEdit = (customer: Customer) => lockedSeller === undefined || customer.seller === lockedSeller;
   const sellerNames = useMemo(
     () => (sellersState.data ?? []).filter((s) => s.status === 'Ativo').map((s) => s.name),
     [sellersState.data],
@@ -170,11 +177,13 @@ export function CustomersPage() {
                           {customer.lastQuoteAt ? formatDateTime(customer.lastQuoteAt) : '—'}
                         </td>
                         <td className={styles.actionsCell}>
-                          <RowMenu
-                            label={customer.name}
-                            onEdit={() => setForm({ item: customer })}
-                            onDelete={() => setToDelete(customer)}
-                          />
+                          {canEdit(customer) && (
+                            <RowMenu
+                              label={customer.name}
+                              onEdit={() => setForm({ item: customer })}
+                              onDelete={canDelete ? () => setToDelete(customer) : undefined}
+                            />
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -195,11 +204,13 @@ export function CustomersPage() {
                           {customer.document && <span className={styles.detail}>{customer.document}</span>}
                         </span>
                       </div>
-                      <RowMenu
-                        label={customer.name}
-                        onEdit={() => setForm({ item: customer })}
-                        onDelete={() => setToDelete(customer)}
-                      />
+                      {canEdit(customer) && (
+                        <RowMenu
+                          label={customer.name}
+                          onEdit={() => setForm({ item: customer })}
+                          onDelete={canDelete ? () => setToDelete(customer) : undefined}
+                        />
+                      )}
                     </div>
                     <p className={styles.cardMeta}>
                       {[customer.city, customer.phone, customer.seller].filter(Boolean).join(' · ')}
@@ -224,6 +235,7 @@ export function CustomersPage() {
           key={form?.item?.id ?? 'novo'}
           initial={form?.item}
           sellers={sellerNames}
+          lockedSeller={lockedSeller}
           busy={busy}
           error={formError}
           onSubmit={handleSave}

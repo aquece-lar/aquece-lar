@@ -1,7 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { NAVIGATION } from '@/config/navigation';
-import { useAuth, useUserName } from '@/contexts/AuthContext';
+import { useAccess, useAuth, useUserName } from '@/contexts/AuthContext';
+import { can } from '@/lib/access';
 import logo from '@/assets/logo-aquece-lar.jpg';
 import styles from './Sidebar.module.css';
 
@@ -15,6 +16,12 @@ interface SidebarProps {
 export function Sidebar({ collapsed, mobileOpen, onToggleCollapsed, onCloseMobile }: SidebarProps) {
   const { logout } = useAuth();
   const user = useUserName();
+  const access = useAccess();
+  // Seções sem nenhum item liberado para o perfil somem inteiras.
+  const sections = NAVIGATION.map((section) => ({
+    ...section,
+    items: section.items.filter((item) => !item.permission || can(access, item.permission)),
+  })).filter((section) => section.items.length > 0);
   const className = [styles.sidebar, collapsed && styles.collapsed, mobileOpen && styles.mobileOpen]
     .filter(Boolean)
     .join(' ');
@@ -56,7 +63,7 @@ export function Sidebar({ collapsed, mobileOpen, onToggleCollapsed, onCloseMobil
         </div>
 
         <nav className={styles.nav}>
-          {NAVIGATION.map((section) => (
+          {sections.map((section) => (
             <div key={section.title} className={styles.section}>
               <p className={styles.sectionTitle}>{section.title}</p>
               {section.items.map((item) => (
@@ -80,7 +87,7 @@ export function Sidebar({ collapsed, mobileOpen, onToggleCollapsed, onCloseMobil
           <span className={styles.userAvatar}>{user.initials}</span>
           <span className={styles.userInfo}>
             <span className={styles.userName}>{user.name}</span>
-            <span className={styles.userRole}>Acesso total</span>
+            <span className={styles.userRole}>{access.role}</span>
           </span>
           <button type="button" className={styles.navButton} aria-label="Sair" title="Sair" onClick={() => void logout()}>
             <Icon name="logout" size={18} />

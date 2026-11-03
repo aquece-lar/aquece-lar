@@ -58,7 +58,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 200px) auto auto;
   align-items: center;
   gap: 12px;
   padding: 12px 0;
@@ -114,6 +114,18 @@
   white-space: nowrap;
 }
 
+.role {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.roleName {
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .access {
   font-size: 12px;
   color: var(--text-3);
@@ -125,14 +137,24 @@
     padding: 16px;
   }
 
-  /* No celular, o último acesso desce para baixo do e-mail. */
+  /* No celular, perfil e último acesso descem para baixo do e-mail; o menu fica na primeira linha. */
   .row {
     grid-template-columns: auto minmax(0, 1fr) auto;
   }
 
-  .access {
+  .role {
     grid-column: 2;
     grid-row: 2;
+  }
+
+  .access {
+    grid-column: 2;
+    grid-row: 3;
     white-space: normal;
+  }
+
+  .row > :last-child {
+    grid-column: 3;
+    grid-row: 1;
   }
 }

@@ -2,6 +2,7 @@ import type { Settings } from '@/types/settings';
 import { settingsProblem } from '@/lib/settingsRules';
 import { api, ApiError, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
+import { mockEnsure } from './mockSession';
 import { SETTINGS_MOCK } from './mocks/settingsMock';
 
 export { MAX_ALERT_DAYS, MAX_VALID_DAYS } from '@/lib/settingsRules';
@@ -14,6 +15,11 @@ export class InvalidSettingsError extends Error {
     super(message);
     this.name = 'InvalidSettingsError';
   }
+}
+
+/** Leitura direta no modo fictício, para os outros serviços simulados (ex.: desconto máximo). */
+export function settingsSnapshot(): Settings {
+  return settings;
 }
 
 export function getSettings(signal?: AbortSignal): Promise<Settings> {
@@ -31,6 +37,7 @@ export async function saveSettings(next: Settings): Promise<Settings> {
     }
   }
   return fromMock(() => {
+    mockEnsure('manageSystem');
     const problem = settingsProblem(next);
     if (problem) throw new InvalidSettingsError(problem);
     settings = structuredClone(next);

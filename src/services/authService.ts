@@ -1,10 +1,8 @@
 import type { Session } from '@/types/auth';
 import { api, ApiError, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
-import { ADMIN_ACCOUNT } from './mocks/authMock';
-
-/** Só nos dados fictícios a sessão fica no navegador; com a API, ela é um cookie HttpOnly. */
-const STORAGE_KEY = 'aquece-lar:sessao';
+import { clearMockSession, readMockSession, saveMockSession } from './mockSession';
+import { MOCK_ACCOUNTS } from './mocks/authMock';
 
 export class InvalidCredentialsError extends Error {
   constructor() {
@@ -17,10 +15,9 @@ export class InvalidCredentialsError extends Error {
 export async function login(email: string, password: string, remember: boolean, signal?: AbortSignal): Promise<Session> {
   if (USE_MOCKS) {
     const session = await fromMock(() => {
-      if (email.trim().toLowerCase() !== ADMIN_ACCOUNT.email || password !== ADMIN_ACCOUNT.password) {
-        throw new InvalidCredentialsError();
-      }
-      return { email: ADMIN_ACCOUNT.email, name: ADMIN_ACCOUNT.name };
+      const account = MOCK_ACCOUNTS.find((a) => a.email === email.trim().toLowerCase());
+      if (!account || password !== account.password) throw new InvalidCredentialsError();
+      return { email: account.email, name: account.name, access: account.access };
     }, signal);
     saveMockSession(session, remember);
     return session;
@@ -50,40 +47,4 @@ export async function logout(): Promise<void> {
     return;
   }
   await api<void>('POST', '/auth/logout');
-}
-
-function isSession(value: unknown): value is Session {
-  const session = value as Session | null;
-  return typeof session?.email === 'string' && typeof session.name === 'string';
-}
-
-function readMockSession(): Session | null {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY) ?? window.sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed: unknown = JSON.parse(raw);
-    return isSession(parsed) ? parsed : null;
-  } catch (error) {
-    console.warn('Não foi possível ler a sessão salva', error);
-    return null;
-  }
-}
-
-/** "Manter conectado" guarda no localStorage; sem ele, a sessão acaba ao fechar o navegador. */
-function saveMockSession(session: Session, remember: boolean): void {
-  clearMockSession();
-  try {
-    (remember ? window.localStorage : window.sessionStorage).setItem(STORAGE_KEY, JSON.stringify(session));
-  } catch (error) {
-    console.warn('Não foi possível salvar a sessão', error);
-  }
-}
-
-function clearMockSession(): void {
-  try {
-    window.localStorage.removeItem(STORAGE_KEY);
-    window.sessionStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.warn('Não foi possível apagar a sessão', error);
-  }
 }

@@ -1,9 +1,12 @@
 import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote, QuoteDetail, QuoteDraft, QuoteEvent } from '@/types/quotes';
+import { can, discountOverLimit } from '@/lib/access';
 import { quoteTotals } from '@/lib/quoteTotals';
 import { api, ApiError, USE_MOCKS } from './http';
 import { InvalidPeriodError, inPeriod, validatePeriod } from './period';
 import { fromMock } from './mockLatency';
+import { mockAccess, mockOwnSeller } from './mockSession';
+import { settingsSnapshot } from './settingsService';
 import { buildHistory, buildQuoteDetail } from './mocks/quoteDetailMock';
 import { QUOTES_MOCK } from './mocks/quotesMock';
 
@@ -44,6 +47,33 @@ export function quotesSnapshot(): readonly Quote[] {
   return quotes;
 }
 
+/** Mesmas regras da API (api/_lib/quotes.ts): em nome próprio e sem passar do desconto máximo sem permissão. */
+function checkDraft(draft: QuoteDraft): void {
+  const access = mockAccess();
+  if (access.role === 'Vendedor' && draft.sellerInfo.name !== access.sellerName) {
+    throw new ApiError(403, 'forbidden', 'O orçamento precisa ficar no seu nome.');
+  }
+  if (!can(access, 'exceedDiscount')) {
+    const max = settingsSnapshot().quotes.maxDiscountPercent;
+    const { subtotal, discount } = quoteTotals(draft.items, draft.discount);
+    if (discountOverLimit(subtotal, discount, max)) {
+      throw new ApiError(403, 'discount_over_limit', `O desconto passa do máximo de ${max}%. Peça a um gerente.`);
+    }
+  }
+}
+
+/** O vendedor só mexe nos próprios orçamentos; os de outros nem existem para quem só vê os seus. */
+function ownQuote(id: string): Quote {
+  const quote = quotes.find((q) => q.id === id);
+  if (!quote) throw new QuoteNotFoundError(id);
+  const access = mockAccess();
+  if (access.role === 'Vendedor' && quote.seller !== access.sellerName) {
+    if (mockOwnSeller() !== null) throw new QuoteNotFoundError(id);
+    throw new ApiError(403, 'forbidden', 'Este orçamento é de outro vendedor.');
+  }
+  return quote;
+}
+
 /** Orçamentos criados no período, do mais recente para o mais antigo. */
 export function listQuotes(period: Period, signal?: AbortSignal): Promise<Quote[]> {
   if (!USE_MOCKS) {
@@ -52,8 +82,9 @@ export function listQuotes(period: Period, signal?: AbortSignal): Promise<Quote[
   }
   return fromMock(() => {
     validatePeriod(period);
+    const own = mockOwnSeller();
     return quotes
-      .filter((q) => inPeriod(q.createdAt, period))
+      .filter((q) => inPeriod(q.createdAt, period) && (own === null || q.seller === own))
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
   }, signal);
 }
@@ -62,7 +93,8 @@ export function getQuote(id: string, signal?: AbortSignal): Promise<QuoteDetail>
   if (!USE_MOCKS) return viaApi(() => api<QuoteDetail>('GET', `/quotes/${id}`, undefined, signal), id);
   return fromMock(() => {
     const quote = quotes.find((q) => q.id === id);
-    if (!quote) throw new QuoteNotFoundError(id);
+    const own = mockOwnSeller();
+    if (!quote || (own !== null && quote.seller !== own)) throw new QuoteNotFoundError(id);
     const events = history.get(id) ?? [];
     const draft = drafts.get(id);
     return draft ? { ...quote, ...draft, history: events } : buildQuoteDetail(quote, events);
@@ -83,6 +115,7 @@ function summarize(draft: QuoteDraft): Pick<Quote, 'customer' | 'seller' | 'amou
 export function createQuote(draft: QuoteDraft, note = 'Orçamento criado'): Promise<Quote> {
   if (!USE_MOCKS) return viaApi(() => api<Quote>('POST', '/quotes', { ...draft, note }));
   return fromMock(() => {
+    checkDraft(draft);
     const next = Math.max(0, ...quotes.map((q) => Number(q.id) || 0)) + 1;
     const createdAt = new Date().toISOString();
     const quote: Quote = {
@@ -103,9 +136,9 @@ export function createQuote(draft: QuoteDraft, note = 'Orçamento criado'): Prom
 export function updateQuote(id: string, draft: QuoteDraft): Promise<Quote> {
   if (!USE_MOCKS) return viaApi(() => api<Quote>('PUT', `/quotes/${id}`, draft), id);
   return fromMock(() => {
-    const current = quotes.find((q) => q.id === id);
-    if (!current) throw new QuoteNotFoundError(id);
+    const current = ownQuote(id);
     if (current.status !== 'Pendente') throw new Error(`O orçamento ${current.number} não está mais pendente.`);
+    checkDraft(draft);
     const updated: Quote = { ...current, ...summarize(draft) };
     quotes = quotes.map((q) => (q.id === id ? updated : q));
     drafts.set(id, draft);
@@ -128,7 +161,7 @@ export async function updateQuoteStatus(id: string, status: QuoteStatus): Promis
     return;
   }
   return fromMock(() => {
-    if (!quotes.some((q) => q.id === id)) throw new QuoteNotFoundError(id);
+    ownQuote(id);
     quotes = quotes.map((q) => (q.id === id ? { ...q, status } : q));
     const events = history.get(id) ?? [];
     history.set(id, [...events, { status, at: new Date().toISOString(), note: STATUS_NOTES[status] }]);

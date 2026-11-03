@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
-import { useUserName } from '@/contexts/AuthContext';
+import { useCan, useUserName } from '@/contexts/AuthContext';
 import { DailyChart } from '@/features/dashboard/DailyChart';
 import { ExpiringQuotes } from '@/features/dashboard/ExpiringQuotes';
 import { KpiCard } from '@/features/dashboard/KpiCard';
@@ -27,6 +27,8 @@ export function DashboardPage() {
   const state = useDashboard(period, reloadKey);
   const greet = useMemo(() => greeting(), []);
   const user = useUserName();
+  // "Vendedores ativos" só faz sentido para quem acompanha a equipe.
+  const canViewSellers = useCan('viewSellers');
 
   const data = state.data;
   const loading = state.status === 'loading' && !data;
@@ -77,7 +79,7 @@ export function DashboardPage() {
       ) : data ? (
         <>
           <div className={styles.kpis}>
-            {data.kpis.map((kpi) => (
+            {data.kpis.filter((kpi) => canViewSellers || kpi.id !== 'vendedores').map((kpi) => (
               <KpiCard key={kpi.id} kpi={kpi} />
             ))}
           </div>

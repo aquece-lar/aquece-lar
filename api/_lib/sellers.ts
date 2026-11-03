@@ -1,4 +1,6 @@
+import type { Access } from '../../src/types/auth';
 import type { Seller, SellerStatus } from '../../src/types/people';
+import { onlyOwn } from '../../src/lib/access.js';
 import { db, num, TZ } from './db.js';
 import { ApiError, invalid, money, notFound, oneOf, text } from './http.js';
 
@@ -27,8 +29,13 @@ function toSeller(row: Record<string, unknown>): Seller {
   };
 }
 
-export async function listSellers(): Promise<Seller[]> {
-  const rows = await db().query(`${SELECT} group by s.id order by s.created_at desc, s.id`);
+/** Vendedor que só vê o que é dele recebe só o próprio cadastro (metas e valores são de cada um). */
+export async function listSellers(access: Access): Promise<Seller[]> {
+  const own = onlyOwn(access) ? (access.sellerId ?? '0') : null;
+  const rows = await db().query(
+    `${SELECT} where ($1::bigint is null or s.id = $1::bigint) group by s.id order by s.created_at desc, s.id`,
+    [own],
+  );
   return rows.map(toSeller);
 }
 

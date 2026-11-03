@@ -20,11 +20,13 @@ interface SelectProps {
   id?: string;
   placeholder?: string;
   invalid?: boolean;
+  /** Mostra o valor sem deixar trocar. */
+  disabled?: boolean;
   'aria-label'?: string;
 }
 
 /** Substituto estilizado do <select>: mesma lista do Combobox, sem busca. */
-export function Select({ value, options, onChange, id, placeholder = 'Selecione', invalid, ...aria }: SelectProps) {
+export function Select({ value, options, onChange, id, placeholder = 'Selecione', invalid, disabled, ...aria }: SelectProps) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -108,6 +110,7 @@ export function Select({ value, options, onChange, id, placeholder = 'Selecione'
         aria-activedescendant={open ? `${uid}-op-${active}` : undefined}
         aria-invalid={invalid}
         aria-label={aria['aria-label']}
+        disabled={disabled}
         onClick={() => (open ? setOpen(false) : show())}
         onKeyDown={onKeyDown}
       >

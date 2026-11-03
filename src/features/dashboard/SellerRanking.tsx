@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useCan } from '@/contexts/AuthContext';
 import type { SellerRank } from '@/types/dashboard';
 import { formatBRLRounded, initials } from '@/lib/format';
 import styles from './SellerRanking.module.css';
@@ -15,6 +16,8 @@ function progress(seller: SellerRank, max: number): { width: number; percent: nu
 export function SellerRanking({ sellers }: { sellers: SellerRank[] }) {
   const sorted = [...sellers].sort((a, b) => b.amount - a.amount);
   const max = Math.max(0, ...sorted.map((s) => s.amount));
+  // O vendedor não abre a tela de vendedores.
+  const canViewSellers = useCan('viewSellers');
 
   return (
     <section className={`card ${styles.card}`} aria-labelledby="ranking-titulo">
@@ -25,9 +28,11 @@ export function SellerRanking({ sellers }: { sellers: SellerRank[] }) {
           </h2>
           <p className={styles.subtitle}>Valor orçado e meta no período</p>
         </div>
-        <Link to="/vendedores" className="link-strong">
-          Ver todos
-        </Link>
+        {canViewSellers && (
+          <Link to="/vendedores" className="link-strong">
+            Ver todos
+          </Link>
+        )}
       </div>
 
       {sorted.length === 0 ? (

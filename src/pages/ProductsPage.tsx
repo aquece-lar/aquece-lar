@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '@/components/Icon';
+import { useCan } from '@/contexts/AuthContext';
 import { ConfirmDelete } from '@/features/people/ConfirmDelete';
 import { ListToolbar } from '@/features/people/ListToolbar';
 import { Modal } from '@/features/people/Modal';
@@ -39,6 +40,8 @@ export function ProductsPage() {
   const [filter, setFilter] = useState<StatusFilter>('todos');
   const [reloadKey, setReloadKey] = useState(0);
   const state = useList(listProducts, 'Não foi possível carregar os produtos.', reloadKey);
+  // O vendedor só consulta o catálogo.
+  const canEdit = useCan('manageCatalog');
 
   /** `{}` = novo cadastro; `{ item }` = edição; `null` = fechado. */
   const [form, setForm] = useState<{ item?: Product } | null>(null);
@@ -98,10 +101,12 @@ export function ProductsPage() {
             {all ? `${activeCount} ativos de ${all.length} cadastrados · os ativos aparecem nos orçamentos` : 'Catálogo'}
           </p>
         </div>
-        <button type="button" className="btn btn-primary" onClick={() => openForm()}>
-          <Icon name="plus" size={16} />
-          Novo produto
-        </button>
+        {canEdit && (
+          <button type="button" className="btn btn-primary" onClick={() => openForm()}>
+            <Icon name="plus" size={16} />
+            Novo produto
+          </button>
+        )}
       </div>
 
       {state.status === 'error' && (
@@ -168,11 +173,13 @@ export function ProductsPage() {
                         </td>
                         <td className={styles.num}>{formatBRL(product.unitPrice)}</td>
                         <td className={styles.actionsCell}>
-                          <RowMenu
-                            label={product.description}
-                            onEdit={() => openForm(product)}
-                            onDelete={() => setToDelete(product)}
-                          />
+                          {canEdit && (
+                            <RowMenu
+                              label={product.description}
+                              onEdit={() => openForm(product)}
+                              onDelete={() => setToDelete(product)}
+                            />
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -193,11 +200,13 @@ export function ProductsPage() {
                           </span>
                         </span>
                       </span>
-                      <RowMenu
-                        label={product.description}
-                        onEdit={() => openForm(product)}
-                        onDelete={() => setToDelete(product)}
-                      />
+                      {canEdit && (
+                        <RowMenu
+                          label={product.description}
+                          onEdit={() => openForm(product)}
+                          onDelete={() => setToDelete(product)}
+                        />
+                      )}
                     </div>
                     <div className={styles.cardFoot}>
                       <StatusBadge status={product.status} />
