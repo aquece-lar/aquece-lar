@@ -1,5 +1,5 @@
 import type { Quote } from '@/types/quotes';
-import { parseISODate, toISODate } from './format';
+import { parseISODate, toISODate } from './format.js';
 
 /** `days`: quantos dias faltam (vencendo) ou já passaram (vencido). */
 export type Expiry = { kind: 'expired'; days: number } | { kind: 'expiring'; days: number };
@@ -25,10 +25,10 @@ export function quoteExpiry(
   return null;
 }
 
-/** Versão curta para listas: "hoje", "2 dias", "vencido". */
+/** Versão curta para listas: "Venc. hoje", "2 dias" (com relógio na tela), "Vencido". */
 export function expiryShortLabel(expiry: Expiry): string {
-  if (expiry.kind === 'expired') return 'vencido';
-  if (expiry.days === 0) return 'hoje';
+  if (expiry.kind === 'expired') return 'Vencido';
+  if (expiry.days === 0) return 'Venc. hoje';
   return expiry.days === 1 ? '1 dia' : `${expiry.days} dias`;
 }
 

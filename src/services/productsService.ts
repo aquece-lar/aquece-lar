@@ -1,11 +1,9 @@
 import type { Product } from '@/types/products';
+import { api, ApiError, isSavedId, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
 import { PRODUCTS_MOCK } from './mocks/productsMock';
 
-/**
- * Cópia em memória do cadastro: valem até a página ser recarregada. Na troca
- * pelo backend, cada função vira uma chamada HTTP com a mesma assinatura.
- */
+/** Modo fictício (testes): cópia em memória do cadastro, até recarregar a página. */
 let products = [...PRODUCTS_MOCK];
 
 export class DuplicateProductCodeError extends Error {
@@ -22,6 +20,7 @@ export function sameCode(a: string, b: string): boolean {
 
 /** Ativos primeiro, depois os inativos; dentro de cada grupo, a ordem do cadastro. */
 export function listProducts(signal?: AbortSignal): Promise<Product[]> {
+  if (!USE_MOCKS) return api<Product[]>('GET', '/products', undefined, signal);
   return fromMock(
     () => [...products.filter((p) => p.status === 'Ativo'), ...products.filter((p) => p.status !== 'Ativo')],
     signal,
@@ -32,7 +31,17 @@ export function listProducts(signal?: AbortSignal): Promise<Product[]> {
  * Cria ou atualiza; o código precisa ser único no cadastro. Produto novo entra
  * no topo; o que acaba de ficar inativo (ou já nasce inativo) vai para o fim.
  */
-export function saveProduct(product: Product): Promise<Product> {
+export async function saveProduct(product: Product): Promise<Product> {
+  if (!USE_MOCKS) {
+    const { id, code, description, category, unitPrice, status, photos = [] } = product;
+    const body = { code, description, category, unitPrice, status, photos };
+    try {
+      return isSavedId(id) ? await api<Product>('PUT', `/products/${id}`, body) : await api<Product>('POST', '/products', body);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'duplicate_product_code') throw new DuplicateProductCodeError(code);
+      throw error;
+    }
+  }
   return fromMock(() => {
     if (products.some((p) => p.id !== product.id && sameCode(p.code, product.code))) {
       throw new DuplicateProductCodeError(product.code);
@@ -47,6 +56,7 @@ export function saveProduct(product: Product): Promise<Product> {
 }
 
 export function deleteProduct(id: string): Promise<void> {
+  if (!USE_MOCKS) return api<void>('DELETE', `/products/${id}`);
   return fromMock(() => {
     products = products.filter((p) => p.id !== id);
   });

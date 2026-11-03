@@ -46,7 +46,7 @@ export function SellerRanking({ sellers }: { sellers: SellerRank[] }) {
                   </span>
                   <span className={styles.info}>
                     <span className={styles.name}>{seller.name}</span>
-                    <span className={styles.qtd}>{seller.quotes} orçamentos</span>
+                    <span className={styles.qtd}>{seller.quotes} {seller.quotes === 1 ? 'orçamento' : 'orçamentos'}</span>
                   </span>
                   <span className={styles.amount}>{formatBRLRounded(seller.amount)}</span>
                 </div>

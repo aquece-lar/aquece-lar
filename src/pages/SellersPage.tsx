@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { ConfirmDelete } from '@/features/people/ConfirmDelete';
 import { ListToolbar } from '@/features/people/ListToolbar';
@@ -38,6 +38,9 @@ export function SellersPage() {
   const [form, setForm] = useState<{ item?: Seller } | null>(null);
   const [toDelete, setToDelete] = useState<Seller | null>(null);
   const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => setFormError(''), [form]);
 
   const all = state.data;
   const sellers = useMemo(
@@ -52,10 +55,13 @@ export function SellersPage() {
 
   async function handleSave(draft: SellerDraft) {
     setBusy(true);
+    setFormError('');
     try {
       await saveSeller({ ...(form?.item ?? { id: newId('v'), quotes: 0, amount: 0 }), ...draft });
       setForm(null);
       setReloadKey((k) => k + 1);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o vendedor.');
     } finally {
       setBusy(false);
     }
@@ -228,6 +234,7 @@ export function SellersPage() {
           key={form?.item?.id ?? 'novo'}
           initial={form?.item}
           busy={busy}
+          error={formError}
           onSubmit={handleSave}
           onCancel={() => setForm(null)}
         />

@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { NAVIGATION } from '@/config/navigation';
+import { useAuth, useUserName } from '@/contexts/AuthContext';
 import logo from '@/assets/logo-aquece-lar.jpg';
 import styles from './Sidebar.module.css';
 
@@ -12,6 +13,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ collapsed, mobileOpen, onToggleCollapsed, onCloseMobile }: SidebarProps) {
+  const { logout } = useAuth();
+  const user = useUserName();
   const className = [styles.sidebar, collapsed && styles.collapsed, mobileOpen && styles.mobileOpen]
     .filter(Boolean)
     .join(' ');
@@ -74,12 +77,12 @@ export function Sidebar({ collapsed, mobileOpen, onToggleCollapsed, onCloseMobil
         </nav>
 
         <div className={styles.userCard}>
-          <span className={styles.userAvatar}>AD</span>
+          <span className={styles.userAvatar}>{user.initials}</span>
           <span className={styles.userInfo}>
-            <span className={styles.userName}>Administrador</span>
+            <span className={styles.userName}>{user.name}</span>
             <span className={styles.userRole}>Acesso total</span>
           </span>
-          <button type="button" className={styles.navButton} aria-label="Sair" title="Sair">
+          <button type="button" className={styles.navButton} aria-label="Sair" title="Sair" onClick={() => void logout()}>
             <Icon name="logout" size={18} />
           </button>
         </div>

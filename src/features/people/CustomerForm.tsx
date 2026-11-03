@@ -25,11 +25,13 @@ interface CustomerFormProps {
   initial?: Partial<CustomerDraft>;
   sellers: string[];
   busy: boolean;
+  /** Erro ao salvar (ex.: recusado pela API). */
+  error?: string;
   onSubmit: (draft: CustomerDraft) => void;
   onCancel: () => void;
 }
 
-export function CustomerForm({ initial, sellers, busy, onSubmit, onCancel }: CustomerFormProps) {
+export function CustomerForm({ initial, sellers, busy, error, onSubmit, onCancel }: CustomerFormProps) {
   const [draft, setDraft] = useState<CustomerDraft>({ ...EMPTY, ...initial });
   const [errors, setErrors] = useState<Errors>({});
   // Mantém o vendedor atual na lista mesmo que ele tenha sido excluído.
@@ -114,6 +116,12 @@ export function CustomerForm({ initial, sellers, busy, onSubmit, onCancel }: Cus
           />
         </div>
       </div>
+
+      {error && (
+        <p className={styles.error} role="alert">
+          {error}
+        </p>
+      )}
 
       <div className={styles.actions}>
         <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={busy}>

@@ -99,6 +99,7 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
   const settings = useSettings();
   const [confirming, setConfirming] = useState<StatusAction | null>(null);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
   const printed = useRef(false);
 
   const quote = state.data;
@@ -119,9 +120,14 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
   async function changeStatus(action: StatusAction) {
     if (!quote) return;
     setBusy(true);
+    setActionError('');
     try {
       await updateQuoteStatus(quote.id, action.to);
       setConfirming(null);
+      setReloadKey((k) => k + 1);
+    } catch (error) {
+      setConfirming(null);
+      setActionError(error instanceof Error ? error.message : 'Não foi possível mudar o status.');
       setReloadKey((k) => k + 1);
     } finally {
       setBusy(false);
@@ -212,6 +218,12 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
           ))}
         </div>
       </div>
+
+      {actionError && (
+        <div className={styles.alert} role="alert" data-no-print>
+          <span>{actionError}</span>
+        </div>
+      )}
 
       <div className={styles.layout}>
         <div className={styles.mainCol}>

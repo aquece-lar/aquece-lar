@@ -12,6 +12,8 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    // API local (npm run dev:api); na Vercel, /api é a função em api/.
+    proxy: { '/api': 'http://localhost:3001' },
   },
   test: {
     environment: 'jsdom',

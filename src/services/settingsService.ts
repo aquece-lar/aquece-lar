@@ -1,11 +1,12 @@
 import type { Settings } from '@/types/settings';
+import { settingsProblem } from '@/lib/settingsRules';
+import { api, ApiError, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
 import { SETTINGS_MOCK } from './mocks/settingsMock';
 
-export const MAX_VALID_DAYS = 365;
-export const MAX_ALERT_DAYS = 60;
+export { MAX_ALERT_DAYS, MAX_VALID_DAYS } from '@/lib/settingsRules';
 
-/** Cópia em memória: vale até a página ser recarregada, como os demais cadastros. */
+/** Cópia em memória do modo fictício: vale até a página ser recarregada. */
 let settings: Settings = structuredClone(SETTINGS_MOCK);
 
 export class InvalidSettingsError extends Error {
@@ -15,31 +16,23 @@ export class InvalidSettingsError extends Error {
   }
 }
 
-/** Regras que a API também deve aplicar; o formulário avisa antes de chegar aqui. */
-function check(next: Settings): void {
-  if (!next.company.name.trim()) throw new InvalidSettingsError('Informe o nome da empresa.');
-  const days = next.quotes.validDays;
-  if (!Number.isInteger(days) || days < 1 || days > MAX_VALID_DAYS) {
-    throw new InvalidSettingsError(`A validade deve ser de 1 a ${MAX_VALID_DAYS} dias.`);
-  }
-  if (next.quotes.paymentTerms.length === 0) throw new InvalidSettingsError('Informe ao menos uma condição de pagamento.');
-  const limit = next.quotes.maxDiscountPercent;
-  if (limit !== null && (!Number.isFinite(limit) || limit < 0 || limit > 100)) {
-    throw new InvalidSettingsError('O desconto máximo deve ser de 0 a 100%.');
-  }
-  const alert = next.quotes.expiryAlertDays;
-  if (!Number.isInteger(alert) || alert < 0 || alert > MAX_ALERT_DAYS) {
-    throw new InvalidSettingsError(`O aviso de vencimento deve ser de 0 a ${MAX_ALERT_DAYS} dias.`);
-  }
-}
-
 export function getSettings(signal?: AbortSignal): Promise<Settings> {
+  if (!USE_MOCKS) return api<Settings>('GET', '/settings', undefined, signal);
   return fromMock(() => structuredClone(settings), signal);
 }
 
-export function saveSettings(next: Settings): Promise<Settings> {
+export async function saveSettings(next: Settings): Promise<Settings> {
+  if (!USE_MOCKS) {
+    try {
+      return await api<Settings>('PUT', '/settings', next);
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'validation') throw new InvalidSettingsError(error.message);
+      throw error;
+    }
+  }
   return fromMock(() => {
-    check(next);
+    const problem = settingsProblem(next);
+    if (problem) throw new InvalidSettingsError(problem);
     settings = structuredClone(next);
     return structuredClone(settings);
   });

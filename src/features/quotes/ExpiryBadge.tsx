@@ -7,7 +7,7 @@ interface ExpiryBadgeProps {
   quote: Pick<Quote, 'status' | 'validUntil'>;
   /** Dias de antecedência do aviso, das configurações. */
   alertDays: number;
-  /** Nas listas: só o relógio e "2 dias"; o texto inteiro fica no detalhe (e no leitor de tela). */
+  /** Nas listas: "Venc. hoje", relógio e "2 dias", ou "Vencido"; o texto inteiro fica no título e no leitor de tela. */
   compact?: boolean;
 }
 
@@ -21,7 +21,7 @@ export function ExpiryBadge({ quote, alertDays, compact = false }: ExpiryBadgePr
   if (compact) {
     return (
       <span className={`${styles.badge} ${styles.compact} ${kind}`} title={label}>
-        <Icon name="clock" size={12} />
+        {expiry.kind === 'expiring' && expiry.days > 0 && <Icon name="clock" size={12} />}
         <span aria-hidden="true">{expiryShortLabel(expiry)}</span>
         <span className="sr-only">{label}</span>
       </span>

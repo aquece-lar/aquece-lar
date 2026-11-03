@@ -1,4 +1,4 @@
-import { parseISODate, toISODate } from '@/lib/format';
+import { parseISODate, toISODate } from '../lib/format.js';
 import type { Period } from '@/types/dashboard';
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;

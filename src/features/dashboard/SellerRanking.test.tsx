@@ -21,5 +21,7 @@ describe('SellerRanking', () => {
     expect(within(items[0]!).getByText('Meta batida: 120% da meta de R$ 200.000')).toBeInTheDocument();
     expect(within(items[1]!).getByText('25% da meta de R$ 200.000')).toBeInTheDocument();
     expect(within(items[2]!).getByText('Sem meta definida')).toBeInTheDocument();
+    expect(within(items[1]!).getByText('3 orçamentos')).toBeInTheDocument();
+    expect(within(items[2]!).getByText('1 orçamento')).toBeInTheDocument();
   });
 });

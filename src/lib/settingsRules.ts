@@ -1,0 +1,26 @@
+import type { Settings } from '@/types/settings';
+
+export const MAX_VALID_DAYS = 365;
+export const MAX_ALERT_DAYS = 60;
+
+/**
+ * Regras das configurações, as mesmas no front e na API (api/_lib).
+ * Devolve a mensagem do primeiro problema, ou `null` se estiver tudo certo.
+ */
+export function settingsProblem(next: Settings): string | null {
+  if (!next.company.name.trim()) return 'Informe o nome da empresa.';
+  const days = next.quotes.validDays;
+  if (!Number.isInteger(days) || days < 1 || days > MAX_VALID_DAYS) {
+    return `A validade deve ser de 1 a ${MAX_VALID_DAYS} dias.`;
+  }
+  if (next.quotes.paymentTerms.length === 0) return 'Informe ao menos uma condição de pagamento.';
+  const limit = next.quotes.maxDiscountPercent;
+  if (limit !== null && (!Number.isFinite(limit) || limit < 0 || limit > 100)) {
+    return 'O desconto máximo deve ser de 0 a 100%.';
+  }
+  const alert = next.quotes.expiryAlertDays;
+  if (!Number.isInteger(alert) || alert < 0 || alert > MAX_ALERT_DAYS) {
+    return `O aviso de vencimento deve ser de 0 a ${MAX_ALERT_DAYS} dias.`;
+  }
+  return null;
+}

@@ -1,4 +1,4 @@
-# Aquece Lar — Orçamentos (frontend)
+# Aquece Lar — Orçamentos
 
 Aplicação React do dashboard Aquece Lar, convertida a partir do mockup HTML em `prototipo/`. Apenas o frontend: os dados vêm de mocks locais, com a mesma assinatura que um serviço HTTP futuro usaria.
 
@@ -11,12 +11,31 @@ Aplicação React do dashboard Aquece Lar, convertida a partir do mockup HTML em
 
 ## Como rodar
 
+O app fala com a API em `/api` (funções da Vercel em `api/`), que usa o Postgres do Neon ligado ao projeto na Vercel. Para rodar localmente:
+
 ```bash
 npm install
-npm run dev
+npx vercel env pull .env.development.local   # credenciais do banco (fica fora do git)
+npm run dev:api                              # API em http://localhost:3001
+npm run dev                                  # app em http://localhost:5173 (repassa /api para a API)
 ```
 
-Abre em `http://localhost:5173`.
+Sem banco, dá para usar os dados fictícios: `VITE_USE_MOCKS=true npm run dev` (os testes sempre usam).
+
+Banco:
+
+```bash
+npm run db:migrate          # cria as tabelas (pode rodar de novo)
+npm run db:seed             # dados de exemplo, num banco vazio
+npm run db:seed -- --reset  # apaga tudo e coloca os dados de exemplo de novo (não mexe nos usuários)
+```
+
+Usuários (quem pode entrar no sistema). O script pede a senha no terminal, sem mostrar:
+
+```bash
+npm run user:save -- email@exemplo.com "Nome da Pessoa"   # cria, ou troca a senha se já existir
+npm run user:save -- email@exemplo.com --remove           # remove
+```
 
 Outros scripts:
 
@@ -47,6 +66,7 @@ prototipo/        mockup HTML original (referência visual)
 
 ## Comportamento atual
 
+- Login obrigatório para todas as telas, com e-mail e senha dos usuários do banco (`npm run user:save`). A sessão é um cookie HttpOnly: com "Manter conectado" dura 30 dias; sem ele, acaba ao fechar o navegador (e no máximo em 12 h). O botão Sair fica no rodapé do menu. Nos dados fictícios, a conta é `admin@aquecelar.com.br` / `admin@adm` (`src/services/mocks/authMock.ts`)
 - Dashboard com período filtrável, KPIs, gráfico diário (quantidade/valor), ranking com a meta de cada vendedor (proporcional ao período), orçamentos vencendo e últimos orçamentos, tudo calculado a partir dos orçamentos (um orçamento novo aparece na hora)
 - Sidebar recolhível no desktop e gaveta no mobile
 - Tema claro/escuro persistido em `localStorage`
@@ -57,6 +77,12 @@ prototipo/        mockup HTML original (referência visual)
 - Configurações: dados da empresa (nome, CNPJ, contato, endereço e logo) no cabeçalho do PDF e um rodapé livre (PIX, banco, garantia); validade, condições de pagamento e observações com que um orçamento novo começa; desconto máximo, acima do qual o orçamento pede confirmação; dias de aviso de vencimento
 - Linhas, fluxogramas, conversas e equivalências ainda são placeholders
 
-Cadastros, configurações, edições, mudanças de status e orçamentos novos ficam em memória e se perdem ao recarregar a página. As datas dos orçamentos de exemplo acompanham o relógio (o mais recente é de ontem), e as contagens de orçamentos de clientes e vendedores são calculadas sobre eles.
+Cadastros, configurações, edições, mudanças de status e orçamentos novos ficam no banco. No modo fictício (testes), ficam em memória e se perdem ao recarregar a página; ali as datas dos orçamentos de exemplo acompanham o relógio (o mais recente é de ontem).
 
-O backend ainda não faz parte deste projeto. Para ligar uma API, substitua as funções em `src/services/` (mantendo as assinaturas) e remova os mocks em `src/services/mocks/`. O que o front espera de cada endpoint (formatos, regras e erros) está em [docs/api-contrato.md](docs/api-contrato.md).
+## API
+
+`api/index.ts` é a única função da Vercel: o `vercel.json` manda `/api/<caminho>` para ela e `api/_lib/router.ts` atende as rotas de [docs/api-contrato.md](docs/api-contrato.md) (vendedores, clientes, produtos, orçamentos, status, configurações e dashboard). As regras de cálculo (total, períodos, vencimento, dashboard) são as mesmas do front, em `src/lib/`; por isso esses arquivos importam uns aos outros com caminho relativo e `.js`, que é o que a função da Vercel entende.
+
+Login: `POST /api/auth/login` confere a senha (hash scrypt na tabela `users`) e devolve um cookie HttpOnly com a sessão (só o hash do token fica na tabela `sessions`); `GET /api/auth/me` diz quem está conectado e `POST /api/auth/logout` encerra. Fora `/api/health` e essas, toda rota responde 401 sem sessão válida, e o front volta para a tela de login. Por enquanto todos os usuários têm acesso total.
+
+O backend em PHP (`backend/`) foi a primeira versão da API, para MySQL; a Vercel não roda PHP, então ele não é usado.

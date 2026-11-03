@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '@/components/Icon';
 import { ConfirmDelete } from '@/features/people/ConfirmDelete';
 import { CustomerForm, type CustomerDraft } from '@/features/people/CustomerForm';
@@ -38,6 +38,9 @@ export function CustomersPage() {
   const [form, setForm] = useState<{ item?: Customer } | null>(null);
   const [toDelete, setToDelete] = useState<Customer | null>(null);
   const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => setFormError(''), [form]);
 
   const all = state.data;
   const customers = useMemo(
@@ -56,10 +59,13 @@ export function CustomersPage() {
 
   async function handleSave(draft: CustomerDraft) {
     setBusy(true);
+    setFormError('');
     try {
       await saveCustomer({ ...(form?.item ?? { id: newId('c'), quotes: 0, lastQuoteAt: null }), ...draft });
       setForm(null);
       setReloadKey((k) => k + 1);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Não foi possível salvar o cliente.');
     } finally {
       setBusy(false);
     }
@@ -219,6 +225,7 @@ export function CustomersPage() {
           initial={form?.item}
           sellers={sellerNames}
           busy={busy}
+          error={formError}
           onSubmit={handleSave}
           onCancel={() => setForm(null)}
         />

@@ -16,19 +16,20 @@ describe('ExpiryBadge', () => {
     const badge = container.firstElementChild as HTMLElement;
     expect(badge).toHaveAttribute('title', 'Vence em 2 dias');
     expect(screen.getByText('2 dias')).toHaveAttribute('aria-hidden', 'true');
+    expect(badge.querySelector('svg')).not.toBeNull();
     expect(screen.getByText('Vence em 2 dias')).toHaveClass('sr-only');
   });
 
-  it('compacto de vencido diz só "vencido"', () => {
+  it('compacto de vencido diz só "Vencido"', () => {
     render(<ExpiryBadge quote={{ status: 'Pendente', validUntil: inDays(-5) }} alertDays={3} compact />);
-    expect(screen.getByText('vencido')).toBeInTheDocument();
+    expect(screen.getByText('Vencido')).toBeInTheDocument();
     expect(screen.getByText('Vencido há 5 dias')).toHaveClass('sr-only');
   });
 
   it('completo (detalhe) mostra o texto inteiro', () => {
     render(<ExpiryBadge quote={{ status: 'Pendente', validUntil: inDays(0) }} alertDays={3} />);
     expect(screen.getByText('Vence hoje')).not.toHaveClass('sr-only');
-    expect(screen.queryByText('hoje')).not.toBeInTheDocument();
+    expect(screen.queryByText('Venc. hoje')).not.toBeInTheDocument();
   });
 
   it('não aparece em aprovado nem fora do prazo de aviso', () => {

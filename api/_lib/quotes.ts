@@ -1,0 +1,246 @@
+import type { Period, QuoteStatus } from '../../src/types/dashboard';
+import type { Quote, QuoteContact, QuoteDetail, QuoteDiscount, QuoteEvent, QuoteItem } from '../../src/types/quotes';
+import { toISODate } from '../../src/lib/format.js';
+import { quoteTotals } from '../../src/lib/quoteTotals.js';
+import { InvalidPeriodError, validatePeriod } from '../../src/services/period.js';
+import { customerIdByName } from './customers.js';
+import { db, iso, isUniqueViolation, num, TZ } from './db.js';
+import { ApiError, invalid, notFound } from './http.js';
+import { sellerIdByName } from './sellers.js';
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Colunas da linha da listagem (lista, dashboard, retorno de criação e edição). */
+const LIST_COLUMNS = `id::text as id, number, customer_name, seller_name, amount, status, created_at,
+  to_char(valid_until, 'YYYY-MM-DD') as valid_until`;
+
+function toQuote(row: Record<string, unknown>): Quote {
+  return {
+    id: row.id as string,
+    number: `#${row.number as number}`,
+    customer: row.customer_name as string,
+    seller: row.seller_name as string,
+    amount: num(row.amount),
+    status: row.status as QuoteStatus,
+    createdAt: iso(row.created_at),
+    validUntil: row.valid_until as string,
+  };
+}
+
+export function checkPeriod(period: Period): void {
+  try {
+    validatePeriod(period);
+  } catch (error) {
+    if (error instanceof InvalidPeriodError) throw new ApiError(400, 'invalid_period', error.message);
+    throw error;
+  }
+}
+
+/** Orçamentos criados no período (dia de São Paulo), do mais recente para o mais antigo. */
+export async function listQuotes(period: Period): Promise<Quote[]> {
+  checkPeriod(period);
+  const rows = await db().query(
+    `select ${LIST_COLUMNS} from quotes
+     where (created_at at time zone '${TZ}')::date between $1::date and $2::date
+     order by created_at desc, id desc`,
+    [period.from, period.to],
+  );
+  return rows.map(toQuote);
+}
+
+/** Para o dashboard: criados desde `from`, mais os em aberto de qualquer data (vencimento). */
+export async function quotesForDashboard(from: string): Promise<Quote[]> {
+  const rows = await db().query(
+    `select ${LIST_COLUMNS} from quotes
+     where (created_at at time zone '${TZ}')::date >= $1::date or status in ('Pendente', 'Enviado')`,
+    [from],
+  );
+  return rows.map(toQuote);
+}
+
+export async function getQuote(id: string): Promise<QuoteDetail> {
+  const [row] = await db().query(
+    `select ${LIST_COLUMNS}, customer_info, seller_info, items, payment_terms, discount, notes
+     from quotes where id = $1`,
+    [id],
+  );
+  if (!row) throw notFound('Orçamento');
+  const events = await db()`select status, at, note from quote_events where quote_id = ${id} order by at, id`;
+  return {
+    ...toQuote(row),
+    customerInfo: row.customer_info as QuoteContact,
+    sellerInfo: row.seller_info as QuoteContact,
+    items: row.items as QuoteItem[],
+    paymentTerms: row.payment_terms as string,
+    discount: (row.discount as QuoteDiscount | null) ?? null,
+    notes: row.notes as string,
+    history: events.map((e): QuoteEvent => ({ status: e.status as QuoteStatus, at: iso(e.at), note: e.note as string })),
+  };
+}
+
+function str(value: unknown, label: string, opts: { min?: number; max?: number } = {}): string {
+  if (value !== undefined && value !== null && typeof value !== 'string') throw invalid(`${label} deve ser um texto.`);
+  const text = ((value as string | undefined) ?? '').trim();
+  if (opts.min && text.length < opts.min) throw invalid(`Informe ${label.toLowerCase()}.`);
+  if (text.length > (opts.max ?? 200)) throw invalid(`${label} pode ter no máximo ${opts.max ?? 200} caracteres.`);
+  return text;
+}
+
+function readContact(value: unknown, who: string): QuoteContact {
+  if (!value || typeof value !== 'object') throw invalid(`Informe o ${who}.`);
+  const c = value as Record<string, unknown>;
+  const contact: QuoteContact = {
+    name: str(c.name, `O nome do ${who}`, { min: 1, max: 160 }),
+    detail: str(c.detail, `O detalhe do ${who}`, { max: 160 }),
+    phone: str(c.phone, `O telefone do ${who}`, { max: 30 }),
+  };
+  if (typeof c.city === 'string' && c.city.trim()) contact.city = str(c.city, `A cidade do ${who}`, { max: 80 });
+  return contact;
+}
+
+function readItems(value: unknown): QuoteItem[] {
+  if (!Array.isArray(value) || value.length === 0) throw invalid('Inclua ao menos um item.');
+  if (value.length > 100) throw invalid('O orçamento pode ter no máximo 100 itens.');
+  return value.map((raw) => {
+    const item = (raw ?? {}) as Record<string, unknown>;
+    const quantity = item.quantity;
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 1) {
+      throw invalid('A quantidade deve ser um número inteiro de 1 em diante.');
+    }
+    const unitPrice = item.unitPrice;
+    if (typeof unitPrice !== 'number' || !Number.isFinite(unitPrice) || unitPrice <= 0) {
+      throw invalid('O valor unitário deve ser maior que zero.');
+    }
+    return {
+      code: str(item.code, 'O código do item', { min: 1, max: 40 }),
+      description: str(item.description, 'A descrição do item', { min: 1, max: 200 }),
+      quantity,
+      unitPrice: Math.round(unitPrice * 100) / 100,
+    };
+  });
+}
+
+function readDiscount(value: unknown, subtotal: number): QuoteDiscount | null {
+  if (value === null || value === undefined) return null;
+  const d = value as Record<string, unknown>;
+  if ((d.type !== 'percent' && d.type !== 'amount') || typeof d.value !== 'number' || !Number.isFinite(d.value) || d.value < 0) {
+    throw invalid('Desconto inválido.');
+  }
+  if (d.type === 'percent' && d.value > 100) throw invalid('O desconto deve ficar entre 0 e 100%.');
+  if (d.type === 'amount' && d.value > subtotal) throw invalid('O desconto não pode passar do subtotal.');
+  return { type: d.type, value: d.value };
+}
+
+/** Valida o corpo de POST/PUT e calcula o total no servidor, sem confiar no front. */
+async function readDraft(body: Record<string, unknown>, isNew: boolean) {
+  const customerInfo = readContact(body.customerInfo, 'cliente');
+  const sellerInfo = readContact(body.sellerInfo, 'vendedor');
+  const items = readItems(body.items);
+  const { subtotal } = quoteTotals(items, null);
+  const discount = readDiscount(body.discount, subtotal);
+  const validUntil = body.validUntil;
+  if (typeof validUntil !== 'string' || !ISO_DATE.test(validUntil) || Number.isNaN(Date.parse(validUntil))) {
+    throw invalid('Informe uma validade válida.');
+  }
+  if (isNew && validUntil < toISODate(new Date())) throw invalid('A validade não pode ser anterior a hoje.');
+  const sellerId = await sellerIdByName(sellerInfo.name);
+  if (!sellerId) throw invalid('Vendedor não encontrado.');
+  return {
+    customerInfo,
+    sellerInfo,
+    items,
+    discount,
+    validUntil,
+    paymentTerms: str(body.paymentTerms, 'A condição de pagamento', { max: 200 }),
+    notes: str(body.notes, 'As observações', { max: 2000 }),
+    amount: quoteTotals(items, discount).total,
+    customerId: await customerIdByName(customerInfo.name),
+    sellerId,
+  };
+}
+
+const CREATION_NOTE = /^(Orçamento criado|Criado a partir do orçamento #\d+)$/;
+
+export async function createQuote(body: Record<string, unknown>): Promise<Quote> {
+  const d = await readDraft(body, true);
+  const note = typeof body.note === 'string' && CREATION_NOTE.test(body.note) ? body.note : 'Orçamento criado';
+  // O número é o próximo da sequência; se dois saírem juntos, a unicidade barra um e ele tenta de novo.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const [row] = await db()`
+        with n as (select coalesce(max(number), 0) + 1 as next from quotes),
+        q as (
+          insert into quotes (id, number, customer_id, seller_id, customer_name, seller_name, customer_info, seller_info,
+            items, valid_until, payment_terms, discount, notes, amount)
+          select n.next, n.next, ${d.customerId}, ${d.sellerId},
+            ${d.customerInfo.name}, ${d.sellerInfo.name}, ${JSON.stringify(d.customerInfo)}::jsonb,
+            ${JSON.stringify(d.sellerInfo)}::jsonb, ${JSON.stringify(d.items)}::jsonb, ${d.validUntil}::date,
+            ${d.paymentTerms}, ${d.discount ? JSON.stringify(d.discount) : null}::jsonb, ${d.notes}, ${d.amount}
+          from n
+          returning *
+        ), e as (
+          insert into quote_events (quote_id, status, at, note) select id, 'Pendente', created_at, ${note} from q
+        )
+        select id::text as id, number, customer_name, seller_name, amount, status, created_at,
+          to_char(valid_until, 'YYYY-MM-DD') as valid_until
+        from q`;
+      return toQuote(row!);
+    } catch (error) {
+      if (attempt < 3 && (isUniqueViolation(error, 'quotes_pkey') || isUniqueViolation(error, 'quotes_number_key'))) continue;
+      throw error;
+    }
+  }
+}
+
+async function currentStatus(id: string): Promise<QuoteStatus> {
+  const [row] = await db()`select status from quotes where id = ${id}`;
+  if (!row) throw notFound('Orçamento');
+  return row.status as QuoteStatus;
+}
+
+const NOT_EDITABLE = new ApiError(409, 'quote_not_editable', 'Só orçamentos pendentes podem ser editados. Duplique este orçamento.');
+
+export async function updateQuote(id: string, body: Record<string, unknown>): Promise<Quote> {
+  if ((await currentStatus(id)) !== 'Pendente') throw NOT_EDITABLE;
+  const d = await readDraft(body, false);
+  const [row] = await db()`
+    with q as (
+      update quotes set customer_id = ${d.customerId}, seller_id = ${d.sellerId}, customer_name = ${d.customerInfo.name},
+        seller_name = ${d.sellerInfo.name}, customer_info = ${JSON.stringify(d.customerInfo)}::jsonb,
+        seller_info = ${JSON.stringify(d.sellerInfo)}::jsonb, items = ${JSON.stringify(d.items)}::jsonb,
+        valid_until = ${d.validUntil}::date, payment_terms = ${d.paymentTerms},
+        discount = ${d.discount ? JSON.stringify(d.discount) : null}::jsonb, notes = ${d.notes}, amount = ${d.amount}
+      where id = ${id} and status = 'Pendente'
+      returning *
+    ), e as (
+      insert into quote_events (quote_id, status, note) select id, 'Pendente', 'Orçamento editado' from q
+    )
+    select id::text as id, number, customer_name, seller_name, amount, status, created_at,
+      to_char(valid_until, 'YYYY-MM-DD') as valid_until
+    from q`;
+  // Mudou de status entre a leitura e a gravação.
+  if (!row) throw NOT_EDITABLE;
+  return toQuote(row);
+}
+
+/** Transições permitidas e o texto do histórico de cada uma. */
+const TRANSITIONS: Record<QuoteStatus, Partial<Record<QuoteStatus, string>>> = {
+  Pendente: { Enviado: 'Enviado ao cliente', Cancelado: 'Orçamento cancelado' },
+  Enviado: { Aprovado: 'Aprovado pelo cliente', Cancelado: 'Orçamento cancelado' },
+  Aprovado: {},
+  Cancelado: { Pendente: 'Voltou para pendente' },
+};
+
+export async function changeStatus(id: string, body: Record<string, unknown>): Promise<QuoteDetail> {
+  const from = await currentStatus(id);
+  const to = body.status as QuoteStatus;
+  let note = TRANSITIONS[from][to];
+  if (!note) throw new ApiError(409, 'invalid_status_transition', `Não é possível passar de ${from} para ${String(to)}.`);
+  if (to === 'Enviado' && body.channel === 'whatsapp') note = 'Enviado ao cliente por WhatsApp';
+  const rows = await db()`
+    with q as (update quotes set status = ${to} where id = ${id} and status = ${from} returning id),
+    e as (insert into quote_events (quote_id, status, note) select id, ${to}, ${note} from q)
+    select id from q`;
+  if (!rows[0]) throw new ApiError(409, 'invalid_status_transition', 'O orçamento mudou enquanto isso. Recarregue a página.');
+  return getQuote(id);
+}

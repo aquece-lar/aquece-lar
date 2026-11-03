@@ -1,9 +1,9 @@
 import type { DailyPoint, DashboardData, ExpirySummary, Kpi, Period, SellerRank } from '@/types/dashboard';
 import type { Seller } from '@/types/people';
 import type { Quote } from '@/types/quotes';
-import { formatBRLRounded, parseISODate, toISODate } from '@/lib/format';
-import { quoteExpiry } from '@/lib/quoteExpiry';
-import { inPeriod, previousPeriod, prorateMonthly } from '../period';
+import { formatBRLRounded, parseISODate, toISODate } from './format.js';
+import { quoteExpiry } from './quoteExpiry.js';
+import { inPeriod, previousPeriod, prorateMonthly } from '../services/period.js';
 
 const RECENT_COUNT = 10;
 
@@ -43,8 +43,9 @@ function buildDaily(period: Period, quotes: readonly Quote[]): DailyPoint[] {
 }
 
 /**
- * Simula o que a API vai calcular: tudo sai dos mesmos orçamentos da
- * listagem, então um orçamento novo aparece no dashboard na hora.
+ * Tudo sai dos mesmos orçamentos da
+ * listagem, então um orçamento novo aparece no dashboard na hora. Usado pela
+ * API (api/_lib) e pelo modo de dados fictícios dos testes.
  */
 function buildExpiry(allQuotes: readonly Quote[], alertDays: number): ExpirySummary {
   const expiring: Quote[] = [];

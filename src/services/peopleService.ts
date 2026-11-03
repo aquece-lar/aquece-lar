@@ -1,15 +1,14 @@
 import type { Customer, Seller } from '@/types/people';
 import type { Quote } from '@/types/quotes';
+import { api, isSavedId, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
 import { CUSTOMERS_MOCK, SELLERS_MOCK } from './mocks/peopleMock';
 import { quotesSnapshot } from './quotesService';
 
 /**
- * Cópias em memória dos mocks: cadastros, edições e exclusões valem
- * até a página ser recarregada. Na troca pelo backend, cada função
- * abaixo vira uma chamada HTTP com a mesma assinatura. As contagens de
- * orçamentos (`quotes`, `amount`, `lastQuoteAt`) são sempre recalculadas
- * na listagem, como a API fará.
+ * Modo fictício (testes): cópias em memória dos mocks, que valem até a página
+ * ser recarregada. As contagens de orçamentos (`quotes`, `amount`,
+ * `lastQuoteAt`) são sempre recalculadas na listagem, como a API faz.
  */
 let sellers = [...SELLERS_MOCK];
 let customers = [...CUSTOMERS_MOCK];
@@ -40,10 +39,16 @@ function withQuoteStats(customer: Customer, quotes: readonly Quote[]): Customer 
 }
 
 export function listSellers(signal?: AbortSignal): Promise<Seller[]> {
+  if (!USE_MOCKS) return api<Seller[]>('GET', '/sellers', undefined, signal);
   return fromMock(() => sellers.map((s) => withMonthStats(s, quotesSnapshot())), signal);
 }
 
 export function saveSeller(seller: Seller): Promise<Seller> {
+  if (!USE_MOCKS) {
+    const { id, name, email, phone, region, status, monthlyGoal } = seller;
+    const body = { name, email, phone, region, status, monthlyGoal };
+    return isSavedId(id) ? api<Seller>('PUT', `/sellers/${id}`, body) : api<Seller>('POST', '/sellers', body);
+  }
   return fromMock(() => {
     sellers = upsert(sellers, seller);
     return seller;
@@ -51,16 +56,23 @@ export function saveSeller(seller: Seller): Promise<Seller> {
 }
 
 export function deleteSeller(id: string): Promise<void> {
+  if (!USE_MOCKS) return api<void>('DELETE', `/sellers/${id}`);
   return fromMock(() => {
     sellers = sellers.filter((s) => s.id !== id);
   });
 }
 
 export function listCustomers(signal?: AbortSignal): Promise<Customer[]> {
+  if (!USE_MOCKS) return api<Customer[]>('GET', '/customers', undefined, signal);
   return fromMock(() => customers.map((c) => withQuoteStats(c, quotesSnapshot())), signal);
 }
 
 export function saveCustomer(customer: Customer): Promise<Customer> {
+  if (!USE_MOCKS) {
+    const { id, name, kind, document, phone, city, seller } = customer;
+    const body = { name, kind, document, phone, city, seller };
+    return isSavedId(id) ? api<Customer>('PUT', `/customers/${id}`, body) : api<Customer>('POST', '/customers', body);
+  }
   return fromMock(() => {
     customers = upsert(customers, customer);
     return customer;
@@ -68,6 +80,7 @@ export function saveCustomer(customer: Customer): Promise<Customer> {
 }
 
 export function deleteCustomer(id: string): Promise<void> {
+  if (!USE_MOCKS) return api<void>('DELETE', `/customers/${id}`);
   return fromMock(() => {
     customers = customers.filter((c) => c.id !== id);
   });
