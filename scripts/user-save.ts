@@ -23,16 +23,17 @@ if (name === '--remove') {
 function askPassword(question: string): Promise<string> {
   const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: process.stdin.isTTY });
   return new Promise((resolve) => {
-    if (process.stdin.isTTY) {
-      process.stdout.write(question);
-      // Esconde o que é digitado.
-      (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = () => {};
-    }
-    rl.question(process.stdin.isTTY ? '' : question, (answer) => {
+    // Mostra a pergunta e esconde o que é digitado depois dela.
+    let muted = false;
+    (rl as unknown as { _writeToOutput: (s: string) => void })._writeToOutput = (s) => {
+      if (!muted) process.stdout.write(s);
+    };
+    rl.question(question, (answer) => {
       rl.close();
       if (process.stdin.isTTY) process.stdout.write('\n');
       resolve(answer);
     });
+    muted = process.stdin.isTTY;
   });
 }
 
