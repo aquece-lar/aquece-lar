@@ -20,6 +20,7 @@
 /* Nas listas: só o prazo curto, todos do mesmo tamanho para alinhar ao lado do status. */
 .compact {
   justify-content: center;
+  gap: 3px;
   min-width: 70px;
   padding: 2px 7px;
   cursor: default;

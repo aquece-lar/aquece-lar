@@ -15,7 +15,8 @@ describe('ExpiryBadge', () => {
     );
     const badge = container.firstElementChild as HTMLElement;
     expect(badge).toHaveAttribute('title', 'Vence em 2 dias');
-    expect(screen.getByText('Venc. 2d')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('2 dias')).toHaveAttribute('aria-hidden', 'true');
+    expect(badge.querySelector('svg')).not.toBeNull();
     expect(screen.getByText('Vence em 2 dias')).toHaveClass('sr-only');
   });
 

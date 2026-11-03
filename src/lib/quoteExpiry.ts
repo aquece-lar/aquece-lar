@@ -25,10 +25,11 @@ export function quoteExpiry(
   return null;
 }
 
-/** Versão curta para listas, no mesmo formato: "Venc. hoje", "Venc. 2d", "Vencido". */
+/** Versão curta para listas: "Venc. hoje", "2 dias" (com relógio na tela), "Vencido". */
 export function expiryShortLabel(expiry: Expiry): string {
   if (expiry.kind === 'expired') return 'Vencido';
-  return expiry.days === 0 ? 'Venc. hoje' : `Venc. ${expiry.days}d`;
+  if (expiry.days === 0) return 'Venc. hoje';
+  return expiry.days === 1 ? '1 dia' : `${expiry.days} dias`;
 }
 
 export function expiryLabel(expiry: Expiry): string {
