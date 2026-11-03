@@ -17,9 +17,10 @@
   color: #fff;
 }
 
-/* Nas listas: só o relógio e o prazo curto. */
+/* Nas listas: só o prazo curto, todos do mesmo tamanho para alinhar ao lado do status. */
 .compact {
-  gap: 3px;
+  justify-content: center;
+  min-width: 70px;
   padding: 2px 7px;
   cursor: default;
 }

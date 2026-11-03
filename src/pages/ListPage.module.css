@@ -378,9 +378,15 @@
   gap: 2px;
 }
 
+/* Status e vencimento sempre lado a lado. */
 .badges {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  flex-wrap: wrap;
+  white-space: nowrap;
+}
+
+/* Status com largura fixa (a do maior, "Cancelado") para o vencimento ficar alinhado. */
+.badges > :first-child {
+  min-width: 8em;
 }

@@ -39,9 +39,9 @@ describe('quoteExpiry', () => {
 
 describe('expiryShortLabel', () => {
   it('resume para as listas', () => {
-    expect(expiryShortLabel({ kind: 'expiring', days: 0 })).toBe('hoje');
-    expect(expiryShortLabel({ kind: 'expiring', days: 1 })).toBe('1 dia');
-    expect(expiryShortLabel({ kind: 'expiring', days: 2 })).toBe('2 dias');
-    expect(expiryShortLabel({ kind: 'expired', days: 9 })).toBe('vencido');
+    expect(expiryShortLabel({ kind: 'expiring', days: 0 })).toBe('Venc. hoje');
+    expect(expiryShortLabel({ kind: 'expiring', days: 1 })).toBe('Venc. 1d');
+    expect(expiryShortLabel({ kind: 'expiring', days: 2 })).toBe('Venc. 2d');
+    expect(expiryShortLabel({ kind: 'expired', days: 9 })).toBe('Vencido');
   });
 });
