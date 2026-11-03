@@ -25,6 +25,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 
 | Função no front | Endpoint sugerido | Telas |
 |---|---|---|
+| `login(username, password)` | `POST /auth/login` → `{ username, name, token }`; credenciais erradas: 401 `invalid_credentials` | Login |
 | `getDashboard(period)` | `GET /dashboard?from=&to=` | Dashboard |
 | `listQuotes(period)` | `GET /quotes?from=&to=` | Lista de orçamentos |
 | `getQuote(id)` | `GET /quotes/:id` | Detalhe, editar, duplicar |
@@ -320,7 +321,7 @@ Coisas que o front faz hoje porque não há backend, e que devem mudar quando a 
 | Total calculado no front e enviado pronto | API recalcula com a regra acima e ignora o valor enviado | Nenhum |
 | PDF gerado pela impressão do navegador | Pode continuar assim; se o WhatsApp precisar anexar o PDF, gerar no servidor | Nenhum por enquanto |
 | Excluir vendedor ou produto não confere se está em uso | Bloquear (409) ou sugerir inativar quando houver orçamentos ou clientes ligados | Pequeno: tratar a mensagem |
-| Sem autenticação (topo mostra "Administrador") | Definir login e perfis | Médio: tela de login e token nas chamadas |
+| Login conferido no navegador contra uma conta fixa (`admin`), sessão no `localStorage`/`sessionStorage` | API valida a senha (com hash) e devolve um token; todas as rotas exigem `Authorization: Bearer` | Pequeno: `authService` guarda o token e os serviços o enviam; a tela de login já existe |
 | Lista de orçamentos sem paginação na API | Ok para o volume atual; paginar no servidor se crescer | Médio, só se for paginar |
 
 ## Como o front vai trocar

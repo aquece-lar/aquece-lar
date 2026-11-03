@@ -59,6 +59,7 @@ prototipo/        mockup HTML original (referência visual)
 
 ## Comportamento atual
 
+- Login obrigatório para todas as telas: usuário `admin`, senha `admin@adm`. "Manter conectado" guarda a sessão no `localStorage`; sem ele, ela acaba ao fechar o navegador. O botão Sair fica no rodapé do menu. Enquanto não houver API, a conta está em `src/services/mocks/authMock.ts`, visível no código do front: o login organiza o acesso, mas não protege os dados
 - Dashboard com período filtrável, KPIs, gráfico diário (quantidade/valor), ranking com a meta de cada vendedor (proporcional ao período), orçamentos vencendo e últimos orçamentos, tudo calculado a partir dos orçamentos (um orçamento novo aparece na hora)
 - Sidebar recolhível no desktop e gaveta no mobile
 - Tema claro/escuro persistido em `localStorage`
