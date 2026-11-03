@@ -5,6 +5,7 @@ import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from '.
 import { getDashboard } from './dashboard.js';
 import { db } from './db.js';
 import { ApiError, errorResponse, json, noContent, readBody } from './http.js';
+import { ensureSchema } from './migrate.js';
 import { createProduct, deleteProduct, listProducts, updateProduct } from './products.js';
 import { changeStatus, createQuote, getQuote, listQuotes, updateQuote } from './quotes.js';
 import { createSeller, deleteSeller, listSellers, updateSeller } from './sellers.js';
@@ -72,6 +73,9 @@ export async function handle(request: Request, path: string): Promise<Response> 
       await db()`select 1`;
       return json({ ok: true });
     }
+
+    // Banco em dia com o código deste deploy antes de qualquer outra consulta.
+    await ensureSchema();
 
     // Únicas rotas abertas: entrar, sair e saber quem está conectado.
     if (resource === 'auth' && !action) {
