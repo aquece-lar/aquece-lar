@@ -79,6 +79,7 @@ export const SCHEMA: string[] = [
     created_at    timestamptz not null default now()
   )`,
   `create unique index if not exists users_email_key on users (lower(email))`,
+  `alter table users add column if not exists last_login_at timestamptz`,
   // Sessões: o cookie leva o token; aqui fica só o hash dele.
   `create table if not exists sessions (
     token_hash text primary key,

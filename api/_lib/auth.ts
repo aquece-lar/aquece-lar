@@ -67,6 +67,7 @@ export async function login(request: Request, body: Record<string, unknown>): Pr
   await db()`
     insert into sessions (token_hash, user_id, expires_at)
     values (${tokenHash(token)}, ${user.id}, now() + make_interval(secs => ${seconds}))`;
+  await db()`update users set last_login_at = now() where id = ${user.id}`;
   // Aproveita o login para limpar sessões vencidas.
   await db()`delete from sessions where expires_at < now()`;
 
@@ -76,15 +77,27 @@ export async function login(request: Request, body: Record<string, unknown>): Pr
   };
 }
 
+/** Quem fez a chamada: o usuário e a sessão (hash do token) do cookie. */
+export interface Caller {
+  id: string;
+  tokenHash: string;
+  session: Session;
+}
+
 /** Usuário da sessão do cookie; sem sessão válida, 401. */
-export async function currentUser(request: Request): Promise<Session> {
+export async function caller(request: Request): Promise<Caller> {
   const token = readToken(request);
   if (!token) throw unauthorized();
+  const hash = tokenHash(token);
   const [row] = await db()`
-    select u.email, u.name from sessions s join users u on u.id = s.user_id
-    where s.token_hash = ${tokenHash(token)} and s.expires_at > now()`;
+    select u.id::text as id, u.email, u.name from sessions s join users u on u.id = s.user_id
+    where s.token_hash = ${hash} and s.expires_at > now()`;
   if (!row) throw unauthorized();
-  return { email: row.email as string, name: row.name as string };
+  return { id: row.id as string, tokenHash: hash, session: { email: row.email as string, name: row.name as string } };
+}
+
+export async function currentUser(request: Request): Promise<Session> {
+  return (await caller(request)).session;
 }
 
 /** Apaga a sessão no banco e o cookie no navegador. */

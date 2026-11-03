@@ -30,7 +30,7 @@ npm run db:seed             # dados de exemplo, num banco vazio
 npm run db:seed -- --reset  # apaga tudo e coloca os dados de exemplo de novo (não mexe nos usuários)
 ```
 
-Usuários (quem pode entrar no sistema). O script pede a senha no terminal, sem mostrar:
+Usuários (quem pode entrar no sistema) se cadastram em Configurações → Usuários. Pelo terminal também dá, por exemplo para criar o primeiro; o script pede a senha sem mostrar:
 
 ```bash
 npm run user:save -- email@exemplo.com "Nome da Pessoa"   # cria, ou troca a senha se já existir

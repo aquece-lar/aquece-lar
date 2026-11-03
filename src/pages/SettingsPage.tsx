@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Icon } from '@/components/Icon';
 import { termDiscount } from '@/config/quotes';
 import { useSettings } from '@/features/settings/useSettings';
+import { UsersSection } from '@/features/settings/UsersSection';
 import { resizeImage } from '@/lib/image';
 import { InvalidSettingsError, MAX_ALERT_DAYS, MAX_VALID_DAYS, saveSettings } from '@/services/settingsService';
 import type { CompanyInfo, Settings } from '@/types/settings';
@@ -483,7 +484,7 @@ export function SettingsPage() {
       <div className={listStyles.pageHead}>
         <div className={listStyles.titles}>
           <h1 className={listStyles.h1}>Configurações</h1>
-          <p className={listStyles.sub}>Dados da empresa e valores padrão dos orçamentos.</p>
+          <p className={listStyles.sub}>Dados da empresa, valores padrão dos orçamentos e usuários.</p>
         </div>
       </div>
 
@@ -497,7 +498,10 @@ export function SettingsPage() {
       )}
 
       {state.status === 'success' ? (
-        <SettingsForm initial={state.data} />
+        <>
+          <SettingsForm initial={state.data} />
+          <UsersSection />
+        </>
       ) : (
         state.status === 'loading' && (
           <div className={`card ${listStyles.skeleton}`} aria-busy="true">

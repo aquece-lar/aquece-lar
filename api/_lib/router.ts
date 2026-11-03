@@ -1,4 +1,4 @@
-import { currentUser, login, logout } from './auth.js';
+import { caller, currentUser, login, logout } from './auth.js';
 import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
 import { getDashboard } from './dashboard.js';
 import { db } from './db.js';
@@ -7,6 +7,7 @@ import { createProduct, deleteProduct, listProducts, updateProduct } from './pro
 import { changeStatus, createQuote, getQuote, listQuotes, updateQuote } from './quotes.js';
 import { createSeller, deleteSeller, listSellers, updateSeller } from './sellers.js';
 import { getSettings, saveSettings } from './settings.js';
+import { createUser, deleteUser, listUsers, updateUser } from './users.js';
 
 type Crud = {
   list: () => Promise<unknown>;
@@ -53,7 +54,7 @@ export async function handle(request: Request, path: string): Promise<Response> 
     }
 
     // Todo o resto exige sessão.
-    await currentUser(request);
+    const me = await caller(request);
 
     // Ids são numéricos; qualquer outra coisa não existe.
     if (rest.length > 0 || (id !== undefined && !/^\d+$/.test(id))) throw new ApiError(404, 'not_found', 'Rota não encontrada.');
@@ -82,6 +83,20 @@ export async function handle(request: Request, path: string): Promise<Response> 
       if (action) throw new ApiError(404, 'not_found', 'Rota não encontrada.');
       if (method === 'GET') return json(await getQuote(id));
       if (method === 'PUT') return json(await updateQuote(id, await readBody(request)));
+      throw METHOD_NOT_ALLOWED;
+    }
+
+    if (resource === 'users' && !action) {
+      if (!id) {
+        if (method === 'GET') return json(await listUsers(me));
+        if (method === 'POST') return json(await createUser(await readBody(request), me), 201);
+        throw METHOD_NOT_ALLOWED;
+      }
+      if (method === 'PUT') return json(await updateUser(id, await readBody(request), me));
+      if (method === 'DELETE') {
+        await deleteUser(id, me);
+        return noContent();
+      }
       throw METHOD_NOT_ALLOWED;
     }
 
