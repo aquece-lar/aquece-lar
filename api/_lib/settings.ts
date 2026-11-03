@@ -12,7 +12,8 @@ const DEFAULTS: Settings = {
 
 export async function getSettings(): Promise<Settings> {
   const [row] = await db()`select data from settings where id = 1`;
-  return (row?.data as Settings | undefined) ?? DEFAULTS;
+  // O jsonb reordena as chaves; remontar mantém a ordem que a tela compara.
+  return row ? readSettings(row.data as Record<string, unknown>) : DEFAULTS;
 }
 
 function str(value: unknown): string {
@@ -49,9 +50,8 @@ export async function saveSettings(body: Record<string, unknown>): Promise<Setti
   const next = readSettings(body);
   const problem = settingsProblem(next);
   if (problem) throw invalid(problem);
-  const [row] = await db()`
+  await db()`
     insert into settings (id, data) values (1, ${JSON.stringify(next)}::jsonb)
-    on conflict (id) do update set data = excluded.data
-    returning data`;
-  return row!.data as Settings;
+    on conflict (id) do update set data = excluded.data`;
+  return next;
 }
