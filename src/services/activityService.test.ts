@@ -27,7 +27,10 @@ describe('listActivity (dados fictícios)', () => {
     ]);
     expect(all[2]!.detail).toBe('desconto máximo: 10% → 15%');
     expect(all[2]!.by).toBe('Administrador');
-    expect(all.some((a) => a.area === 'Orçamentos' && a.quoteId !== null)).toBe(true);
+    const quote = all.find((a) => a.area === 'Orçamentos');
+    expect(quote?.quoteId).not.toBeNull();
+    expect(quote?.quote).toMatchObject({ seller: expect.any(String), customer: expect.any(String), amount: expect.any(Number) });
+    expect(all.find((a) => a.area === 'Usuários')?.quote).toBeNull();
     expect(all.every((a, i) => i === 0 || Date.parse(all[i - 1]!.at) >= Date.parse(a.at))).toBe(true);
 
     const onlyUsers = await listActivity('Usuários');

@@ -6,7 +6,7 @@ import formStyles from '@/features/people/Form.module.css';
 import toolbarStyles from '@/features/people/ListToolbar.module.css';
 import { Modal } from '@/features/people/Modal';
 import { useList } from '@/features/people/useList';
-import { formatDateTime } from '@/lib/format';
+import { formatBRL, formatDateTime } from '@/lib/format';
 import { deleteActivity, listActivity } from '@/services/activityService';
 import { ACTIVITY_AREAS, ACTIVITY_LIMIT, type ActivityArea } from '@/types/activity';
 import styles from './ActivitySection.module.css';
@@ -199,6 +199,12 @@ export function ActivitySection({ reloadKey: outside = 0 }: { reloadKey?: number
                       activity.summary
                     )}
                   </span>
+                  {activity.quote && (
+                    <span className={styles.quoteInfo}>
+                      <span>{activity.quote.seller}</span> · <span>{activity.quote.customer}</span> ·{' '}
+                      <span>{formatBRL(activity.quote.amount)}</span>
+                    </span>
+                  )}
                   {activity.detail && <span className={styles.detail}>{activity.detail}</span>}
                 </span>
                 <span className={styles.who}>

@@ -1,6 +1,6 @@
 import { ACTIVITY_AREAS, ACTIVITY_LIMIT, type Activity, type ActivityArea } from '../../src/types/activity.js';
 import type { Caller } from './auth.js';
-import { db, iso } from './db.js';
+import { db, iso, num } from './db.js';
 import { invalid } from './http.js';
 
 /** Guarda uma alteração de configurações ou de usuários (os orçamentos ficam em quote_events). */
@@ -21,10 +21,12 @@ export async function listActivity(url: URL): Promise<Activity[]> {
   if (area !== null && !ACTIVITY_AREAS.includes(area as ActivityArea)) throw invalid('Área inválida.');
   const rows = await db().query(
     `select * from (
-       select 'a' || id as id, at, user_name, area, summary, detail, null::text as quote_id from activity_log
+       select 'a' || id as id, at, user_name, area, summary, detail, null::text as quote_id,
+         null::text as seller_name, null::text as customer_name, null::numeric as amount
+       from activity_log
        union all
        select 'q' || e.id, e.at, e.user_name, 'Orçamentos', 'Orçamento #' || q.number || ': ' || e.note, e.detail,
-         q.id::text
+         q.id::text, q.seller_name, q.customer_name, q.amount
        from quote_events e join quotes q on q.id = e.quote_id
        where e.in_log
      ) x
@@ -41,6 +43,9 @@ export async function listActivity(url: URL): Promise<Activity[]> {
     summary: row.summary as string,
     detail: row.detail as string,
     quoteId: (row.quote_id as string | null) ?? null,
+    quote: row.quote_id
+      ? { seller: row.seller_name as string, customer: row.customer_name as string, amount: num(row.amount) }
+      : null,
   }));
 }
 

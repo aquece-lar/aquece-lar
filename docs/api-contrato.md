@@ -316,6 +316,7 @@ interface Activity {
   summary: string;         // "Orçamento #1181: Orçamento editado", "Usuário Ana criado"
   detail: string;          // o que mudou; pode ser vazio
   quoteId: string | null;  // para o link do orçamento
+  quote: { seller: string; customer: string; amount: number } | null; // o orçamento como está hoje
 }
 ```
 

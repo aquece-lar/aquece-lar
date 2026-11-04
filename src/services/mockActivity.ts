@@ -13,7 +13,7 @@ const hiddenQuoteEvents = new Set<string>();
 export function recordMockActivity(area: Exclude<ActivityArea, 'Orçamentos'>, summary: string, detail = ''): void {
   log = [
     ...log,
-    { id: `a${nextId++}`, at: new Date().toISOString(), by: mockUserName(), area, summary, detail, quoteId: null },
+    { id: `a${nextId++}`, at: new Date().toISOString(), by: mockUserName(), area, summary, detail, quoteId: null, quote: null },
   ];
 }
 

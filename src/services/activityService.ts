@@ -18,6 +18,7 @@ function mockAll(): Activity[] {
         summary: `Orçamento ${quote.number}: ${event.note}`,
         detail: event.detail,
         quoteId: quote.id,
+        quote: { seller: quote.seller, customer: quote.customer, amount: quote.amount },
       }),
     )
     .filter((a) => !isHiddenQuoteEvent(a.id));

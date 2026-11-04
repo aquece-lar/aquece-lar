@@ -17,6 +17,14 @@ export interface Activity {
   detail: string;
   /** Orçamento a que se refere, para o link; `null` nas outras áreas. */
   quoteId: string | null;
+  /** Resumo do orçamento como está hoje (vendedor, cliente e valor); `null` nas outras áreas. */
+  quote: ActivityQuote | null;
+}
+
+export interface ActivityQuote {
+  seller: string;
+  customer: string;
+  amount: number;
 }
 
 /** Quantas linhas o histórico mostra, das mais recentes. */

@@ -101,7 +101,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 20px 118px minmax(0, 1fr) minmax(0, 180px);
+  grid-template-columns: 20px 118px minmax(0, 1fr) auto;
   align-items: start;
   gap: 12px;
   padding: 10px 0;
@@ -143,6 +143,16 @@
   text-decoration-color: currentColor;
 }
 
+/* Vendedor · cliente · valor do orçamento; quebra só entre as partes. */
+.quoteInfo {
+  font-size: 12px;
+  color: var(--text-3);
+}
+
+.quoteInfo > span {
+  white-space: nowrap;
+}
+
 .detail {
   font-size: 12px;
   color: var(--text-2);
@@ -157,6 +167,7 @@
   font-size: 13px;
   text-align: right;
   min-width: 0;
+  max-width: 180px;
 }
 
 .area {
@@ -178,11 +189,19 @@
     grid-template-columns: 20px minmax(0, 1fr) auto;
   }
 
-  .when {
+  .row > :first-child {
+    grid-column: 1;
     grid-row: 1;
   }
 
+  .when {
+    grid-column: 2;
+    grid-row: 1;
+    white-space: nowrap;
+  }
+
   .who {
+    grid-column: 3;
     grid-row: 1;
     flex-direction: row;
     gap: 6px;
@@ -191,5 +210,6 @@
 
   .what {
     grid-column: 2 / -1;
+    grid-row: 2;
   }
 }
