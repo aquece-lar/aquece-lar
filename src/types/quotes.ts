@@ -15,6 +15,10 @@ export interface QuoteEvent {
   /** Data/hora ISO. */
   at: string;
   note: string;
+  /** Quem fez (nome do usuário); `null` em eventos de antes do histórico guardar o autor. */
+  by: string | null;
+  /** O que mudou numa edição (ex.: "desconto: 5% → 10%"); vazio nos outros eventos. */
+  detail: string;
 }
 
 export interface QuoteContact {

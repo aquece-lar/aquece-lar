@@ -1,6 +1,9 @@
 import type { Settings } from '../../src/types/settings';
 import { DEFAULT_NOTES, PAYMENT_TERMS, VALID_DAYS } from '../../src/config/quotes.js';
+import { describeSettingsChanges } from '../../src/lib/changes.js';
 import { settingsProblem } from '../../src/lib/settingsRules.js';
+import { logActivity } from './activity.js';
+import type { Caller } from './auth.js';
 import { db } from './db.js';
 import { invalid } from './http.js';
 
@@ -46,12 +49,14 @@ function readSettings(body: Record<string, unknown>): Settings {
   };
 }
 
-export async function saveSettings(body: Record<string, unknown>): Promise<Settings> {
+export async function saveSettings(body: Record<string, unknown>, me: Caller): Promise<Settings> {
   const next = readSettings(body);
   const problem = settingsProblem(next);
   if (problem) throw invalid(problem);
+  const detail = describeSettingsChanges(await getSettings(), next);
   await db()`
     insert into settings (id, data) values (1, ${JSON.stringify(next)}::jsonb)
     on conflict (id) do update set data = excluded.data`;
+  if (detail) await logActivity(me, 'Configurações', 'Configurações alteradas', detail);
   return next;
 }

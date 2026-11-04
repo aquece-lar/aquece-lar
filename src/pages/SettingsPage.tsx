@@ -1,7 +1,8 @@
-import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useCallback, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Icon } from '@/components/Icon';
 import { termDiscount } from '@/config/quotes';
 import { useSettings } from '@/features/settings/useSettings';
+import { ActivitySection } from '@/features/settings/ActivitySection';
 import { UsersSection } from '@/features/settings/UsersSection';
 import { resizeImage } from '@/lib/image';
 import { InvalidSettingsError, MAX_ALERT_DAYS, MAX_VALID_DAYS, saveSettings } from '@/services/settingsService';
@@ -166,7 +167,8 @@ function LogoField({ value, onChange }: { value: string | null; onChange: (logo:
   );
 }
 
-function SettingsForm({ initial }: { initial: Settings }) {
+/** `onSaved`: avisa a página para atualizar o histórico. */
+function SettingsForm({ initial, onSaved }: { initial: Settings; onSaved: () => void }) {
   const [saved, setSaved] = useState(initial);
   const [form, setForm] = useState(() => toForm(initial));
   const [errors, setErrors] = useState<Errors>({});
@@ -223,6 +225,7 @@ function SettingsForm({ initial }: { initial: Settings }) {
       setForm(toForm(result));
       nextKey.current = result.quotes.paymentTerms.length;
       setNotice({ kind: 'ok', text: 'Configurações salvas.' });
+      onSaved();
     } catch (error) {
       const text = error instanceof InvalidSettingsError ? error.message : 'Não foi possível salvar. Tente novamente.';
       setNotice({ kind: 'error', text });
@@ -478,13 +481,16 @@ function SettingsForm({ initial }: { initial: Settings }) {
 export function SettingsPage() {
   const [reloadKey, setReloadKey] = useState(0);
   const state = useSettings(reloadKey);
+  // Cada gravação aparece no histórico logo abaixo, sem precisar atualizar.
+  const [activityKey, setActivityKey] = useState(0);
+  const changed = useCallback(() => setActivityKey((k) => k + 1), []);
 
   return (
     <>
       <div className={listStyles.pageHead}>
         <div className={listStyles.titles}>
           <h1 className={listStyles.h1}>Configurações</h1>
-          <p className={listStyles.sub}>Dados da empresa, valores padrão dos orçamentos e usuários.</p>
+          <p className={listStyles.sub}>Dados da empresa, valores padrão dos orçamentos, usuários e histórico de alterações.</p>
         </div>
       </div>
 
@@ -499,8 +505,9 @@ export function SettingsPage() {
 
       {state.status === 'success' ? (
         <>
-          <SettingsForm initial={state.data} />
-          <UsersSection />
+          <SettingsForm initial={state.data} onSaved={changed} />
+          <UsersSection onChanged={changed} />
+          <ActivitySection reloadKey={activityKey} />
         </>
       ) : (
         state.status === 'loading' && (

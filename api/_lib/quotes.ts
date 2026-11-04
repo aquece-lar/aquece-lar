@@ -1,11 +1,12 @@
 import type { Access } from '../../src/types/auth';
+import { describeQuoteChanges } from '../../src/lib/changes.js';
 import type { Period, QuoteStatus } from '../../src/types/dashboard';
 import type { Quote, QuoteContact, QuoteDetail, QuoteDiscount, QuoteEvent, QuoteItem } from '../../src/types/quotes';
 import { can, discountOverLimit, onlyOwn } from '../../src/lib/access.js';
 import { toISODate } from '../../src/lib/format.js';
 import { quoteTotals } from '../../src/lib/quoteTotals.js';
 import { InvalidPeriodError, validatePeriod } from '../../src/services/period.js';
-import { forbidden } from './auth.js';
+import { forbidden, type Caller } from './auth.js';
 import { customerIdByName, customerSellerId } from './customers.js';
 import { db, iso, isUniqueViolation, num, TZ } from './db.js';
 import { ApiError, invalid, notFound } from './http.js';
@@ -80,7 +81,8 @@ export async function getQuote(id: string, access: Access): Promise<QuoteDetail>
     [id, ownSellerId(access)],
   );
   if (!row) throw notFound('Orçamento');
-  const events = await db()`select status, at, note from quote_events where quote_id = ${id} order by at, id`;
+  const events = await db()`
+    select status, at, note, user_name, detail from quote_events where quote_id = ${id} order by at, id`;
   return {
     ...toQuote(row),
     customerInfo: row.customer_info as QuoteContact,
@@ -89,7 +91,15 @@ export async function getQuote(id: string, access: Access): Promise<QuoteDetail>
     paymentTerms: row.payment_terms as string,
     discount: (row.discount as QuoteDiscount | null) ?? null,
     notes: row.notes as string,
-    history: events.map((e): QuoteEvent => ({ status: e.status as QuoteStatus, at: iso(e.at), note: e.note as string })),
+    history: events.map(
+      (e): QuoteEvent => ({
+        status: e.status as QuoteStatus,
+        at: iso(e.at),
+        note: e.note as string,
+        by: (e.user_name as string | null) ?? null,
+        detail: e.detail as string,
+      }),
+    ),
   };
 }
 
@@ -195,8 +205,8 @@ async function readDraft(body: Record<string, unknown>, isNew: boolean, access: 
 
 const CREATION_NOTE = /^(Orçamento criado|Criado a partir do orçamento #\d+)$/;
 
-export async function createQuote(body: Record<string, unknown>, access: Access): Promise<Quote> {
-  const d = await readDraft(body, true, access);
+export async function createQuote(body: Record<string, unknown>, me: Caller): Promise<Quote> {
+  const d = await readDraft(body, true, me.access);
   const note = typeof body.note === 'string' && CREATION_NOTE.test(body.note) ? body.note : 'Orçamento criado';
   // O número é o próximo da sequência; se dois saírem juntos, a unicidade barra um e ele tenta de novo.
   for (let attempt = 0; ; attempt++) {
@@ -213,7 +223,8 @@ export async function createQuote(body: Record<string, unknown>, access: Access)
           from n
           returning *
         ), e as (
-          insert into quote_events (quote_id, status, at, note) select id, 'Pendente', created_at, ${note} from q
+          insert into quote_events (quote_id, status, at, note, user_id, user_name)
+          select id, 'Pendente', created_at, ${note}, ${me.id}::bigint, ${me.session.name} from q
         )
         select id::text as id, number, customer_name, seller_name, amount, status, created_at,
           to_char(valid_until, 'YYYY-MM-DD') as valid_until
@@ -239,9 +250,10 @@ async function currentStatus(id: string, access: Access): Promise<QuoteStatus> {
 
 const NOT_EDITABLE = new ApiError(409, 'quote_not_editable', 'Só orçamentos pendentes podem ser editados. Duplique este orçamento.');
 
-export async function updateQuote(id: string, body: Record<string, unknown>, access: Access): Promise<Quote> {
-  if ((await currentStatus(id, access)) !== 'Pendente') throw NOT_EDITABLE;
-  const d = await readDraft(body, false, access);
+export async function updateQuote(id: string, body: Record<string, unknown>, me: Caller): Promise<Quote> {
+  if ((await currentStatus(id, me.access)) !== 'Pendente') throw NOT_EDITABLE;
+  const d = await readDraft(body, false, me.access);
+  const detail = describeQuoteChanges(await getQuote(id, me.access), d);
   const [row] = await db()`
     with q as (
       update quotes set customer_id = ${d.customerId}, seller_id = ${d.sellerId}, customer_name = ${d.customerInfo.name},
@@ -252,7 +264,8 @@ export async function updateQuote(id: string, body: Record<string, unknown>, acc
       where id = ${id} and status = 'Pendente'
       returning *
     ), e as (
-      insert into quote_events (quote_id, status, note) select id, 'Pendente', 'Orçamento editado' from q
+      insert into quote_events (quote_id, status, note, user_id, user_name, detail)
+      select id, 'Pendente', 'Orçamento editado', ${me.id}::bigint, ${me.session.name}, ${detail} from q
     )
     select id::text as id, number, customer_name, seller_name, amount, status, created_at,
       to_char(valid_until, 'YYYY-MM-DD') as valid_until
@@ -270,16 +283,19 @@ const TRANSITIONS: Record<QuoteStatus, Partial<Record<QuoteStatus, string>>> = {
   Cancelado: { Pendente: 'Voltou para pendente' },
 };
 
-export async function changeStatus(id: string, body: Record<string, unknown>, access: Access): Promise<QuoteDetail> {
-  const from = await currentStatus(id, access);
+export async function changeStatus(id: string, body: Record<string, unknown>, me: Caller): Promise<QuoteDetail> {
+  const from = await currentStatus(id, me.access);
   const to = body.status as QuoteStatus;
   let note = TRANSITIONS[from][to];
   if (!note) throw new ApiError(409, 'invalid_status_transition', `Não é possível passar de ${from} para ${String(to)}.`);
   if (to === 'Enviado' && body.channel === 'whatsapp') note = 'Enviado ao cliente por WhatsApp';
   const rows = await db()`
     with q as (update quotes set status = ${to} where id = ${id} and status = ${from} returning id),
-    e as (insert into quote_events (quote_id, status, note) select id, ${to}, ${note} from q)
+    e as (
+      insert into quote_events (quote_id, status, note, user_id, user_name)
+      select id, ${to}, ${note}, ${me.id}::bigint, ${me.session.name} from q
+    )
     select id from q`;
   if (!rows[0]) throw new ApiError(409, 'invalid_status_transition', 'O orçamento mudou enquanto isso. Recarregue a página.');
-  return getQuote(id, access);
+  return getQuote(id, me.access);
 }

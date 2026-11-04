@@ -1,5 +1,6 @@
 import type { Access } from '../../src/types/auth';
 import { can, type Permission } from '../../src/lib/access.js';
+import { listActivity } from './activity.js';
 import { caller, currentUser, forbidden, login, logout } from './auth.js';
 import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
 import { getDashboard } from './dashboard.js';
@@ -102,24 +103,30 @@ export async function handle(request: Request, path: string): Promise<Response> 
       if (method === 'GET') return json(await getSettings());
       if (method === 'PUT') {
         ensure(me.access, 'manageSystem');
-        return json(await saveSettings(await readBody(request)));
+        return json(await saveSettings(await readBody(request), me));
       }
       throw METHOD_NOT_ALLOWED;
+    }
+
+    if (resource === 'activity' && !id) {
+      if (method !== 'GET') throw METHOD_NOT_ALLOWED;
+      ensure(me.access, 'manageSystem');
+      return json(await listActivity(url));
     }
 
     if (resource === 'quotes') {
       if (!id) {
         if (method === 'GET') return json(await listQuotes(period(url), me.access));
-        if (method === 'POST') return json(await createQuote(await readBody(request), me.access), 201);
+        if (method === 'POST') return json(await createQuote(await readBody(request), me), 201);
         throw METHOD_NOT_ALLOWED;
       }
       if (action === 'status') {
         if (method !== 'POST') throw METHOD_NOT_ALLOWED;
-        return json(await changeStatus(id, await readBody(request), me.access));
+        return json(await changeStatus(id, await readBody(request), me));
       }
       if (action) throw new ApiError(404, 'not_found', 'Rota não encontrada.');
       if (method === 'GET') return json(await getQuote(id, me.access));
-      if (method === 'PUT') return json(await updateQuote(id, await readBody(request), me.access));
+      if (method === 'PUT') return json(await updateQuote(id, await readBody(request), me));
       throw METHOD_NOT_ALLOWED;
     }
 

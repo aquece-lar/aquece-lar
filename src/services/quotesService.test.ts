@@ -81,6 +81,11 @@ describe('updateQuote', () => {
     expect(updated.customer).toBe('Outro');
     const detail = await getQuote(quote.id);
     expect(detail.history.map((e) => e.note)).toEqual(['Orçamento criado', 'Orçamento editado']);
+    // Sem ninguém conectado nos testes, quem faz é o administrador.
+    expect(detail.history.map((e) => e.by)).toEqual(['Administrador', 'Administrador']);
+    expect(detail.history[1]!.detail).toBe(
+      'cliente: Cliente Teste → Outro; desconto: 5% → sem desconto; total: R$ 7.818,50 → R$ 8.230,00',
+    );
   });
 
   it('recusa editar um orçamento que não está pendente', async () => {

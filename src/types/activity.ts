@@ -1,0 +1,23 @@
+/** Onde a alteração aconteceu. */
+export type ActivityArea = 'Orçamentos' | 'Configurações' | 'Usuários';
+
+export const ACTIVITY_AREAS: readonly ActivityArea[] = ['Orçamentos', 'Configurações', 'Usuários'];
+
+/** Uma linha do histórico de alterações (Configurações → Histórico). */
+export interface Activity {
+  id: string;
+  /** Data/hora ISO. */
+  at: string;
+  /** Quem fez; `null` quando não se sabe (eventos antigos). */
+  by: string | null;
+  area: ActivityArea;
+  /** O que foi feito, ex.: "Orçamento #1181 editado". */
+  summary: string;
+  /** O que mudou, ex.: "desconto: 5% → 10%"; pode ficar vazio. */
+  detail: string;
+  /** Orçamento a que se refere, para o link; `null` nas outras áreas. */
+  quoteId: string | null;
+}
+
+/** Quantas linhas o histórico mostra, das mais recentes. */
+export const ACTIVITY_LIMIT = 300;

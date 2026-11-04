@@ -94,4 +94,20 @@ export const SCHEMA: string[] = [
   `alter table users add column if not exists seller_id bigint references sellers (id) on delete set null`,
   `alter table users add column if not exists see_all boolean not null default false`,
   `alter table users add column if not exists exceed_discount boolean not null default false`,
+  // Histórico de alterações: quem fez cada passo do orçamento e o que mudou na edição.
+  `alter table quote_events add column if not exists user_id bigint references users (id) on delete set null`,
+  `alter table quote_events add column if not exists user_name text`,
+  `alter table quote_events add column if not exists detail text not null default ''`,
+  // O resto (configurações e usuários). O nome fica copiado: vale mesmo depois de o usuário ser excluído.
+  `create table if not exists activity_log (
+    id        bigint generated always as identity primary key,
+    at        timestamptz not null default now(),
+    user_id   bigint references users (id) on delete set null,
+    user_name text,
+    area      text not null check (area in ('Configurações', 'Usuários')),
+    summary   text not null,
+    detail    text not null default ''
+  )`,
+  `create index if not exists activity_log_at_idx on activity_log (at)`,
+  `create index if not exists quote_events_at_idx on quote_events (at)`,
 ];

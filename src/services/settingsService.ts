@@ -1,6 +1,8 @@
 import type { Settings } from '@/types/settings';
+import { describeSettingsChanges } from '@/lib/changes';
 import { settingsProblem } from '@/lib/settingsRules';
 import { api, ApiError, USE_MOCKS } from './http';
+import { recordMockActivity } from './mockActivity';
 import { fromMock } from './mockLatency';
 import { mockEnsure } from './mockSession';
 import { SETTINGS_MOCK } from './mocks/settingsMock';
@@ -40,6 +42,8 @@ export async function saveSettings(next: Settings): Promise<Settings> {
     mockEnsure('manageSystem');
     const problem = settingsProblem(next);
     if (problem) throw new InvalidSettingsError(problem);
+    const detail = describeSettingsChanges(settings, next);
+    if (detail) recordMockActivity('Configurações', 'Configurações alteradas', detail);
     settings = structuredClone(next);
     return structuredClone(settings);
   });

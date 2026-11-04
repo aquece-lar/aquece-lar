@@ -48,17 +48,18 @@ function buildItems(quote: Quote, subtotal: number): QuoteItem[] {
   });
 }
 
-/** Histórico coerente com o status original do orçamento. */
+/** Histórico coerente com o status original do orçamento; cada passo feito pelo próprio vendedor. */
 export function buildHistory(quote: Quote): QuoteEvent[] {
-  const events: QuoteEvent[] = [{ status: 'Pendente', at: quote.createdAt, note: 'Orçamento criado' }];
+  const by = quote.seller;
+  const events: QuoteEvent[] = [{ status: 'Pendente', at: quote.createdAt, note: 'Orçamento criado', by, detail: '' }];
   if (quote.status === 'Enviado' || quote.status === 'Aprovado') {
-    events.push({ status: 'Enviado', at: hoursAfter(quote.createdAt, 2), note: 'Enviado ao cliente por WhatsApp' });
+    events.push({ status: 'Enviado', at: hoursAfter(quote.createdAt, 2), note: 'Enviado ao cliente por WhatsApp', by, detail: '' });
   }
   if (quote.status === 'Aprovado') {
-    events.push({ status: 'Aprovado', at: hoursAfter(quote.createdAt, 30), note: 'Aprovado pelo cliente' });
+    events.push({ status: 'Aprovado', at: hoursAfter(quote.createdAt, 30), note: 'Aprovado pelo cliente', by, detail: '' });
   }
   if (quote.status === 'Cancelado') {
-    events.push({ status: 'Cancelado', at: hoursAfter(quote.createdAt, 26), note: 'Cliente desistiu da compra' });
+    events.push({ status: 'Cancelado', at: hoursAfter(quote.createdAt, 26), note: 'Cliente desistiu da compra', by, detail: '' });
   }
   return events;
 }

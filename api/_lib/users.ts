@@ -1,5 +1,7 @@
 import { ROLES, type Role } from '../../src/types/auth.js';
 import { MIN_PASSWORD, type User } from '../../src/types/users.js';
+import { describeUserChanges } from '../../src/lib/changes.js';
+import { logActivity } from './activity.js';
 import { ACCESS_COLUMNS, ACCESS_JOIN, hashPassword, toAccess, type Caller } from './auth.js';
 import { db, iso, isUniqueViolation } from './db.js';
 import { ApiError, invalid, notFound, oneOf, text } from './http.js';
@@ -86,7 +88,9 @@ export async function createUser(body: Record<string, unknown>, me: Caller): Pro
       values (${u.name}, ${u.email}, ${await hashPassword(u.password)}, ${u.role}, ${u.sellerId}, ${u.seeAll},
         ${u.exceedDiscount})
       returning id::text as id`;
-    return getUser(row!.id as string, me);
+    const user = await getUser(row!.id as string, me);
+    await logActivity(me, 'Usuários', `Usuário ${user.name} criado`, `perfil: ${user.role}`);
+    return user;
   } catch (error) {
     if (isUniqueViolation(error, 'users_email_key')) throw duplicate(u.email);
     throw error;
@@ -95,12 +99,11 @@ export async function createUser(body: Record<string, unknown>, me: Caller): Pro
 
 export async function updateUser(id: string, body: Record<string, unknown>, me: Caller): Promise<User> {
   const u = await readUser(body, false);
-  const [current] = await db()`select role from users where id = ${id}`;
-  if (!current) throw notFound('Usuário');
+  const current = await getUser(id, me);
   if (id === me.id && u.role !== me.access.role) {
     throw new ApiError(409, 'cannot_change_own_role', 'Você não pode mudar o seu próprio perfil.');
   }
-  if ((current.role as Role) === 'Administrador' && u.role !== 'Administrador') await ensureAnotherAdmin(id);
+  if (current.role === 'Administrador' && u.role !== 'Administrador') await ensureAnotherAdmin(id);
   try {
     const rows = await db()`
       update users set name = ${u.name}, email = ${u.email}, role = ${u.role}, seller_id = ${u.sellerId},
@@ -116,13 +119,17 @@ export async function updateUser(id: string, body: Record<string, unknown>, me: 
     // Senha nova derruba as sessões abertas, menos a de quem está trocando.
     await db()`delete from sessions where user_id = ${id} and token_hash <> ${me.tokenHash}`;
   }
-  return getUser(id, me);
+  const updated = await getUser(id, me);
+  const detail = describeUserChanges(current, updated, Boolean(u.password));
+  if (detail) await logActivity(me, 'Usuários', `Usuário ${updated.name} editado`, detail);
+  return updated;
 }
 
 export async function deleteUser(id: string, me: Caller): Promise<void> {
   if (id === me.id) throw new ApiError(409, 'cannot_delete_self', 'Você não pode excluir a sua própria conta.');
-  const [current] = await db()`select role from users where id = ${id}`;
+  const [current] = await db()`select name, role from users where id = ${id}`;
   if (!current) throw notFound('Usuário');
   if ((current.role as Role) === 'Administrador') await ensureAnotherAdmin(id);
   await db()`delete from users where id = ${id}`;
+  await logActivity(me, 'Usuários', `Usuário ${current.name as string} excluído`);
 }

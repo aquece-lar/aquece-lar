@@ -37,6 +37,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 | `listCustomers()` / `saveCustomer()` / `deleteCustomer(id)` | `GET` / `POST`·`PUT` / `DELETE /customers[/:id]` | Clientes, orçamento |
 | `listProducts()` / `saveProduct()` / `deleteProduct(id)` | `GET` / `POST`·`PUT` / `DELETE /products[/:id]` | Produtos, orçamento |
 | `getSettings()` / `saveSettings(settings)` | `GET` / `PUT /settings` | Configurações, orçamento, PDF |
+| `listActivity(area)` | `GET /activity[?area=]` (veja [Histórico de alterações](#histórico-de-alterações)) | Configurações → Histórico |
 
 `save*` hoje cria ou atualiza conforme o id já existir. Na API: `POST` cria (sem id, devolve o registro com id), `PUT /:id` atualiza.
 
@@ -64,7 +65,7 @@ interface Access {
 | Clientes (`/customers`) | todos | todos | só os dele (com `seeAll`, todos); cadastra sempre no próprio nome e só edita os dele; não exclui |
 | Vendedores e produtos | edita | edita | só consulta (`GET /sellers` devolve só o próprio cadastro, se não tiver `seeAll`) |
 | Dashboard | geral | geral | só os números dele (com `seeAll`, geral) |
-| `PUT /settings` e `/users` | sim | 403 | 403 |
+| `PUT /settings`, `/users` e `/activity` | sim | 403 | 403 |
 
 - Sem permissão: 403 `forbidden`. Orçamento de outro vendedor, para quem só vê os seus, responde 404 (como se não existisse).
 - `GET /settings` continua aberto a todos: o formulário de orçamento usa os padrões.
@@ -173,6 +174,8 @@ interface QuoteEvent {
   status: QuoteStatus; // status do orçamento depois do evento
   at: string;          // data/hora ISO
   note: string;        // texto mostrado na linha do tempo
+  by: string | null;   // nome de quem fez; null nos eventos de antes do histórico guardar o autor
+  detail: string;      // o que mudou numa edição ("desconto: 5% → 10%; total: …"); vazio nos outros
 }
 
 /** Corpo de POST /quotes e PUT /quotes/:id. */
@@ -297,6 +300,28 @@ Regras:
 - `code` obrigatório e único (`aqg-20d` conflita com `AQG-20D`): 409 `duplicate_product_code`. `description` com 3+ caracteres; `unitPrice` > 0.
 - **Ordem do `GET`:** ativos primeiro, inativos depois. Um produto novo entra no topo; um produto que acabou de ser inativado vai para o fim da lista. Sugestão: ativos por `createdAt` decrescente e inativos por `inactivatedAt` crescente.
 - Só produtos **ativos** aparecem na busca do orçamento. Ao editar ou duplicar um orçamento antigo, os itens de produtos inativos ou excluídos continuam aparecendo (o front resolve isso com os dados do próprio item).
+
+---
+
+## Histórico de alterações — `GET /activity`
+
+Só administrador. Junta os eventos dos orçamentos (`quote_events`) com as alterações de configurações e usuários (`activity_log`), das mais recentes para as mais antigas, no máximo 300. `?area=Orçamentos|Configurações|Usuários` filtra; área inválida: 400 `validation`.
+
+```ts
+interface Activity {
+  id: string;
+  at: string;              // data/hora ISO
+  by: string | null;       // nome de quem fez (copiado: vale mesmo se o usuário for excluído)
+  area: 'Orçamentos' | 'Configurações' | 'Usuários';
+  summary: string;         // "Orçamento #1181: Orçamento editado", "Usuário Ana criado"
+  detail: string;          // o que mudou; pode ser vazio
+  quoteId: string | null;  // para o link do orçamento
+}
+```
+
+- O texto de "o que mudou" sai de `src/lib/changes.ts`, a mesma conta na API e nos dados fictícios. Textos longos (endereço, rodapé, observações) só dizem que mudaram.
+- Senhas nunca aparecem: só "senha trocada".
+- Salvar as configurações sem mudar nada não gera linha.
 
 ---
 

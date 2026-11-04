@@ -50,6 +50,11 @@ export function mockAccess(): Access {
   return readMockSession()?.access ?? FULL_ACCESS;
 }
 
+/** Nome de quem está conectado, para o histórico; sem ninguém (testes de tela), o administrador. */
+export function mockUserName(): string {
+  return readMockSession()?.name ?? 'Administrador';
+}
+
 /** Mesmo 403 da API quando o perfil não pode. */
 export function mockEnsure(permission: Permission, message = 'Seu perfil não tem permissão para isso.'): void {
   if (!can(mockAccess(), permission)) throw new ApiError(403, 'forbidden', message);

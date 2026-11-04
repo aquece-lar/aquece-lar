@@ -1,12 +1,17 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { getSettings } from '@/services/settingsService';
 import { SettingsPage } from './SettingsPage';
 
 async function renderPage() {
   const user = userEvent.setup();
-  render(<SettingsPage />);
+  render(
+    <MemoryRouter>
+      <SettingsPage />
+    </MemoryRouter>,
+  );
   await screen.findByRole('textbox', { name: /nome/i });
   return user;
 }

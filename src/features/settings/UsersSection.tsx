@@ -13,7 +13,7 @@ import { UserForm } from './UserForm';
 import styles from './UsersSection.module.css';
 
 /** Quem pode entrar no sistema: cadastrar, trocar senha e excluir. Salva na hora, fora do formulário de cima. */
-export function UsersSection() {
+export function UsersSection({ onChanged }: { onChanged?: () => void }) {
   const refresh = useRefreshSession();
   const [reloadKey, setReloadKey] = useState(0);
   const state = useList(listUsers, 'Não foi possível carregar os usuários.', reloadKey);
@@ -39,6 +39,7 @@ export function UsersSection() {
       else await createUser(draft);
       setForm(null);
       setReloadKey((k) => k + 1);
+      onChanged?.();
       // O próprio nome e o perfil aparecem no menu e no topo.
       if (editing?.isCurrent) await refresh();
     } catch (error) {
@@ -55,6 +56,7 @@ export function UsersSection() {
       await deleteUser(toDelete.id);
       setToDelete(null);
       setReloadKey((k) => k + 1);
+      onChanged?.();
     } finally {
       setBusy(false);
     }

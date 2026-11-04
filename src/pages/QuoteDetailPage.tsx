@@ -336,7 +336,11 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
                   <span className={`${styles.dot} ${DOT_CLASS[event.status]}`} aria-hidden="true" />
                   <div className={styles.eventText}>
                     <span className={styles.eventNote}>{event.note}</span>
-                    <span className={styles.muted}>{formatDateTime(event.at)}</span>
+                    {event.detail && <span className={styles.eventDetail}>{event.detail}</span>}
+                    <span className={styles.muted}>
+                      {formatDateTime(event.at)}
+                      {event.by && ` · ${event.by}`}
+                    </span>
                   </div>
                 </li>
               ))}

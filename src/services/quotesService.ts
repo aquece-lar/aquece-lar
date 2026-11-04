@@ -1,11 +1,12 @@
 import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote, QuoteDetail, QuoteDraft, QuoteEvent } from '@/types/quotes';
 import { can, discountOverLimit } from '@/lib/access';
+import { describeQuoteChanges } from '@/lib/changes';
 import { quoteTotals } from '@/lib/quoteTotals';
 import { api, ApiError, USE_MOCKS } from './http';
 import { InvalidPeriodError, inPeriod, validatePeriod } from './period';
 import { fromMock } from './mockLatency';
-import { mockAccess, mockOwnSeller } from './mockSession';
+import { mockAccess, mockOwnSeller, mockUserName } from './mockSession';
 import { settingsSnapshot } from './settingsService';
 import { buildHistory, buildQuoteDetail } from './mocks/quoteDetailMock';
 import { QUOTES_MOCK } from './mocks/quotesMock';
@@ -45,6 +46,11 @@ async function viaApi<T>(call: () => Promise<T>, id?: string): Promise<T> {
  */
 export function quotesSnapshot(): readonly Quote[] {
   return quotes;
+}
+
+/** Todos os eventos, para o histórico geral do modo fictício (Configurações → Histórico). */
+export function quoteEventsSnapshot(): { quote: Quote; event: QuoteEvent }[] {
+  return quotes.flatMap((quote) => (history.get(quote.id) ?? []).map((event) => ({ quote, event })));
 }
 
 /** Mesmas regras da API (api/_lib/quotes.ts): em nome próprio e sem passar do desconto máximo sem permissão. */
@@ -127,7 +133,7 @@ export function createQuote(draft: QuoteDraft, note = 'Orçamento criado'): Prom
     };
     quotes = [quote, ...quotes];
     drafts.set(quote.id, draft);
-    history.set(quote.id, [{ status: 'Pendente', at: createdAt, note }]);
+    history.set(quote.id, [{ status: 'Pendente', at: createdAt, note, by: mockUserName(), detail: '' }]);
     return quote;
   });
 }
@@ -139,11 +145,13 @@ export function updateQuote(id: string, draft: QuoteDraft): Promise<Quote> {
     const current = ownQuote(id);
     if (current.status !== 'Pendente') throw new Error(`O orçamento ${current.number} não está mais pendente.`);
     checkDraft(draft);
+    const before = drafts.get(id) ?? buildQuoteDetail(current, []);
+    const detail = describeQuoteChanges(before, draft);
     const updated: Quote = { ...current, ...summarize(draft) };
     quotes = quotes.map((q) => (q.id === id ? updated : q));
     drafts.set(id, draft);
     const events = history.get(id) ?? [];
-    history.set(id, [...events, { status: 'Pendente', at: new Date().toISOString(), note: 'Orçamento editado' }]);
+    history.set(id, [...events, { status: 'Pendente', at: new Date().toISOString(), note: 'Orçamento editado', by: mockUserName(), detail }]);
     return updated;
   });
 }
@@ -164,6 +172,6 @@ export async function updateQuoteStatus(id: string, status: QuoteStatus): Promis
     ownQuote(id);
     quotes = quotes.map((q) => (q.id === id ? { ...q, status } : q));
     const events = history.get(id) ?? [];
-    history.set(id, [...events, { status, at: new Date().toISOString(), note: STATUS_NOTES[status] }]);
+    history.set(id, [...events, { status, at: new Date().toISOString(), note: STATUS_NOTES[status], by: mockUserName(), detail: '' }]);
   });
 }

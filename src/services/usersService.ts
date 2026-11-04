@@ -1,5 +1,7 @@
 import type { User, UserDraft } from '@/types/users';
+import { describeUserChanges } from '@/lib/changes';
 import { api, ApiError, USE_MOCKS } from './http';
+import { recordMockActivity } from './mockActivity';
 import { fromMock } from './mockLatency';
 import { mockAccess, mockEnsure, readMockSession } from './mockSession';
 import { MOCK_ACCOUNTS } from './mocks/authMock';
@@ -69,6 +71,7 @@ export function createUser(draft: UserDraft): Promise<User> {
     if (emailTaken(draft.email)) throw conflict('duplicate_email', `Já existe um usuário com o e-mail ${draft.email}.`);
     const user = { id: String(Date.now()), createdAt: new Date().toISOString(), lastLoginAt: null, ...fromDraft(draft) };
     users = [...users, user];
+    recordMockActivity('Usuários', `Usuário ${user.name} criado`, `perfil: ${user.role}`);
     return withCurrent(user);
   });
 }
@@ -87,6 +90,8 @@ export function updateUser(id: string, draft: UserDraft): Promise<User> {
     if (current.role === 'Administrador' && draft.role !== 'Administrador') ensureAnotherAdmin(id);
     const updated = { ...current, ...fromDraft(draft) };
     users = users.map((u) => (u.id === id ? updated : u));
+    const detail = describeUserChanges(current, updated, Boolean(draft.password));
+    if (detail) recordMockActivity('Usuários', `Usuário ${updated.name} editado`, detail);
     return withCurrent(updated);
   });
 }
@@ -100,5 +105,6 @@ export function deleteUser(id: string): Promise<void> {
     if (withCurrent(current).isCurrent) throw conflict('cannot_delete_self', 'Você não pode excluir a sua própria conta.');
     if (current.role === 'Administrador') ensureAnotherAdmin(id);
     users = users.filter((u) => u.id !== id);
+    recordMockActivity('Usuários', `Usuário ${current.name} excluído`);
   });
 }
