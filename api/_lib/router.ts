@@ -1,6 +1,6 @@
 import type { Access } from '../../src/types/auth';
 import { can, type Permission } from '../../src/lib/access.js';
-import { listActivity } from './activity.js';
+import { deleteActivity, listActivity } from './activity.js';
 import { caller, currentUser, forbidden, login, logout } from './auth.js';
 import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
 import { getDashboard } from './dashboard.js';
@@ -109,9 +109,10 @@ export async function handle(request: Request, path: string): Promise<Response> 
     }
 
     if (resource === 'activity' && !id) {
-      if (method !== 'GET') throw METHOD_NOT_ALLOWED;
       ensure(me.access, 'manageSystem');
-      return json(await listActivity(url));
+      if (method === 'GET') return json(await listActivity(url));
+      if (method === 'DELETE') return json(await deleteActivity(await readBody(request), me));
+      throw METHOD_NOT_ALLOWED;
     }
 
     if (resource === 'quotes') {

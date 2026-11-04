@@ -37,7 +37,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 | `listCustomers()` / `saveCustomer()` / `deleteCustomer(id)` | `GET` / `POST`·`PUT` / `DELETE /customers[/:id]` | Clientes, orçamento |
 | `listProducts()` / `saveProduct()` / `deleteProduct(id)` | `GET` / `POST`·`PUT` / `DELETE /products[/:id]` | Produtos, orçamento |
 | `getSettings()` / `saveSettings(settings)` | `GET` / `PUT /settings` | Configurações, orçamento, PDF |
-| `listActivity(area)` | `GET /activity[?area=]` (veja [Histórico de alterações](#histórico-de-alterações)) | Configurações → Histórico |
+| `listActivity(area)` / `deleteActivity(ids \| 'all')` | `GET /activity[?area=]` / `DELETE /activity` (veja [Histórico de alterações](#histórico-de-alterações)) | Configurações → Histórico |
 
 `save*` hoje cria ou atualiza conforme o id já existir. Na API: `POST` cria (sem id, devolve o registro com id), `PUT /:id` atualiza.
 
@@ -322,6 +322,7 @@ interface Activity {
 - O texto de "o que mudou" sai de `src/lib/changes.ts`, a mesma conta na API e nos dados fictícios. Textos longos (endereço, rodapé, observações) só dizem que mudaram.
 - Senhas nunca aparecem: só "senha trocada".
 - Salvar as configurações sem mudar nada não gera linha.
+- `DELETE /activity` com `{ ids: string[] }` (até 300) ou `{ all: true }` → `{ deleted }`. Linhas de configurações e usuários são apagadas; eventos de orçamento só saem do histórico geral (`quote_events.in_log = false`) e continuam na linha do tempo do orçamento. A limpeza vira uma linha nova ("Histórico apagado", com quantos itens e quem fez).
 
 ---
 

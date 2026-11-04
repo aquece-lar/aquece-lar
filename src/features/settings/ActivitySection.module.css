@@ -35,6 +35,36 @@
   color: var(--text-3);
 }
 
+.headActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.danger {
+  color: var(--err);
+}
+
+.selectionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: 40px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* Só a caixa, sem o espaço de cima e de baixo do formulário. */
+.check {
+  padding: 0;
+}
+
+.check input {
+  top: 0;
+}
+
 .filters {
   display: flex;
   align-items: center;
@@ -71,7 +101,7 @@
 
 .row {
   display: grid;
-  grid-template-columns: 118px minmax(0, 1fr) minmax(0, 180px);
+  grid-template-columns: 20px 118px minmax(0, 1fr) minmax(0, 180px);
   align-items: start;
   gap: 12px;
   padding: 10px 0;
@@ -80,7 +110,6 @@
 
 .row:first-child {
   border-top: 0;
-  padding-top: 0;
 }
 
 .when {
@@ -144,9 +173,9 @@
     padding: 16px;
   }
 
-  /* No celular: data e autor numa linha, o que mudou embaixo. */
+  /* No celular: caixa, data e autor numa linha, o que mudou embaixo. */
   .row {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
   }
 
   .when {
@@ -161,6 +190,6 @@
   }
 
   .what {
-    grid-column: 1 / -1;
+    grid-column: 2 / -1;
   }
 }

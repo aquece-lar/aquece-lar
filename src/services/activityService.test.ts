@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { listActivity } from './activityService';
+import { deleteActivity, listActivity } from './activityService';
+import { getQuote } from './quotesService';
 import { getSettings, saveSettings } from './settingsService';
 import { createUser, deleteUser } from './usersService';
 
@@ -31,5 +32,25 @@ describe('listActivity (dados fictícios)', () => {
 
     const onlyUsers = await listActivity('Usuários');
     expect(onlyUsers.map((a) => a.area)).toEqual(['Usuários', 'Usuários']);
+  });
+
+  it('apaga os escolhidos e tudo, sem mexer na linha do tempo do orçamento, e registra a limpeza', async () => {
+    const before = await listActivity('Orçamentos');
+    const target = before[0]!;
+    expect(await deleteActivity([target.id])).toBe(1);
+
+    const after = await listActivity(null);
+    expect(after.some((a) => a.id === target.id)).toBe(false);
+    expect(after[0]).toMatchObject({ summary: 'Histórico apagado', detail: '1 item', area: 'Configurações' });
+    const quote = await getQuote(target.quoteId!);
+    expect(quote.history.length).toBeGreaterThan(0);
+
+    const total = after.length;
+    // A lista mostra no máximo 300; "tudo" apaga também o que não aparece.
+    const deleted = await deleteActivity('all');
+    expect(deleted).toBeGreaterThanOrEqual(total);
+    const cleared = await listActivity(null);
+    expect(cleared).toHaveLength(1);
+    expect(cleared[0]).toMatchObject({ summary: 'Histórico apagado', detail: `tudo (${deleted} itens)` });
   });
 });

@@ -110,4 +110,6 @@ export const SCHEMA: string[] = [
   )`,
   `create index if not exists activity_log_at_idx on activity_log (at)`,
   `create index if not exists quote_events_at_idx on quote_events (at)`,
+  // Apagar do histórico geral só esconde o evento: a linha do tempo do orçamento continua inteira.
+  `alter table quote_events add column if not exists in_log boolean not null default true`,
 ];

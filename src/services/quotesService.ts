@@ -49,8 +49,8 @@ export function quotesSnapshot(): readonly Quote[] {
 }
 
 /** Todos os eventos, para o histórico geral do modo fictício (Configurações → Histórico). */
-export function quoteEventsSnapshot(): { quote: Quote; event: QuoteEvent }[] {
-  return quotes.flatMap((quote) => (history.get(quote.id) ?? []).map((event) => ({ quote, event })));
+export function quoteEventsSnapshot(): { quote: Quote; event: QuoteEvent; index: number }[] {
+  return quotes.flatMap((quote) => (history.get(quote.id) ?? []).map((event, index) => ({ quote, event, index })));
 }
 
 /** Mesmas regras da API (api/_lib/quotes.ts): em nome próprio e sem passar do desconto máximo sem permissão. */
