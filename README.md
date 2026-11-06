@@ -78,7 +78,7 @@ prototipo/        mockup HTML original (referência visual)
 - Vencimento: pendentes e enviados ganham selo "Vence em N dias" (antecedência nas configurações) ou "Vencido" na lista e no detalhe
 - Produtos: listagem com busca e filtro de status, cadastro com código único, categoria e preço de tabela; os ativos formam o catálogo do orçamento
 - Configurações: dados da empresa (nome, CNPJ, contato, endereço e logo) no cabeçalho do PDF e um rodapé livre (PIX, banco, garantia); validade, condições de pagamento e observações com que um orçamento novo começa; desconto máximo, acima do qual o orçamento pede confirmação; dias de aviso de vencimento
-- Linhas, fluxogramas, conversas e equivalências ainda são placeholders
+- Fluxogramas, conversas e equivalências ainda são placeholders
 
 Cadastros, configurações, edições, mudanças de status e orçamentos novos ficam no banco. No modo fictício (testes), ficam em memória e se perdem ao recarregar a página; ali as datas dos orçamentos de exemplo acompanham o relógio (o mais recente é de ontem).
 

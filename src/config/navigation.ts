@@ -28,7 +28,6 @@ export const NAVIGATION: NavSection[] = [
     title: 'Catálogo',
     items: [
       { label: 'Produtos', icon: 'box', to: '/produtos' },
-      { label: 'Linhas e códigos', icon: 'layers', to: '/linhas' },
     ],
   },
   {
