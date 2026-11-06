@@ -73,6 +73,18 @@ export async function quotesForDashboard(from: string, access: Access): Promise<
   return rows.map(toQuote);
 }
 
+/** Em aberto (pendentes e enviados) que vencem de hoje até `days` dias, para os avisos. */
+export async function quotesExpiringWithin(days: number, access: Access): Promise<Quote[]> {
+  const rows = await db().query(
+    `select ${LIST_COLUMNS} from quotes
+     where status in ('Pendente', 'Enviado')
+       and valid_until between (now() at time zone '${TZ}')::date and (now() at time zone '${TZ}')::date + $1::int
+       and ($2::bigint is null or seller_id = $2::bigint)`,
+    [days, ownSellerId(access)],
+  );
+  return rows.map(toQuote);
+}
+
 /** Orçamento de outro vendedor responde como inexistente para quem só vê os seus. */
 export async function getQuote(id: string, access: Access): Promise<QuoteDetail> {
   const [row] = await db().query(
