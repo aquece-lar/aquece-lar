@@ -3,16 +3,25 @@ import { buildNotifications } from '../../src/lib/notifications.js';
 import type { Caller } from './auth.js';
 import { db } from './db.js';
 import { invalid } from './http.js';
-import { quotesExpiringWithin } from './quotes.js';
+import { quotesAwaitingReply, quotesExpiringWithin } from './quotes.js';
 import { getSettings } from './settings.js';
 
 /** Todos os avisos do perfil, inclusive os que a pessoa já excluiu. */
 async function allNotifications(me: Caller): Promise<Notification[]> {
-  const days = (await getSettings()).quotes.expiryAlertDays;
-  return buildNotifications(await quotesExpiringWithin(days, me.access), days);
+  const { expiryAlertDays: days, followUpDays } = (await getSettings()).quotes;
+  const [expiring, awaiting] = await Promise.all([
+    quotesExpiringWithin(days, me.access),
+    followUpDays > 0 ? quotesAwaitingReply(followUpDays, me.access) : null,
+  ]);
+  // Um orçamento pode estar nas duas listas; a regra decide qual aviso ele gera.
+  const byId = new Map([...expiring, ...(awaiting?.quotes ?? [])].map((q) => [q.id, q]));
+  return buildNotifications([...byId.values()], days, undefined, {
+    days: followUpDays,
+    sentOn: awaiting?.sentOn ?? new Map(),
+  });
 }
 
-/** Avisos de quem está conectado: orçamentos dele (ou de todos, conforme o perfil) vencendo, menos os excluídos. */
+/** Avisos de quem está conectado: orçamentos dele (ou de todos, conforme o perfil) vencendo ou sem resposta, menos os excluídos. */
 export async function listNotifications(me: Caller): Promise<Notification[]> {
   const [all, dismissed] = await Promise.all([
     allNotifications(me),

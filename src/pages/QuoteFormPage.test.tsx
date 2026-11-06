@@ -206,6 +206,7 @@ describe('padrões vindos das configurações', () => {
         notes: 'Frete incluso.',
         maxDiscountPercent: null,
         expiryAlertDays: 3,
+        followUpDays: 3,
       },
     });
     try {

@@ -26,6 +26,7 @@ interface FormState {
   /** Vazio é sem limite. */
   maxDiscount: string;
   alertDays: string;
+  followUpDays: string;
   terms: Term[];
   notes: string;
 }
@@ -37,6 +38,7 @@ interface Errors {
   validDays?: string;
   maxDiscount?: string;
   alertDays?: string;
+  followUpDays?: string;
   terms?: string;
   term?: Record<number, string>;
 }
@@ -47,6 +49,7 @@ function toForm(settings: Settings): FormState {
     validDays: String(settings.quotes.validDays),
     maxDiscount: settings.quotes.maxDiscountPercent === null ? '' : String(settings.quotes.maxDiscountPercent),
     alertDays: String(settings.quotes.expiryAlertDays),
+    followUpDays: String(settings.quotes.followUpDays),
     terms: settings.quotes.paymentTerms.map((text, key) => ({ key, text })),
     notes: settings.quotes.notes,
   };
@@ -70,6 +73,7 @@ function toSettings(form: FormState): Settings {
       notes: form.notes.trim(),
       maxDiscountPercent: form.maxDiscount.trim() === '' ? null : Number(form.maxDiscount),
       expiryAlertDays: Number(form.alertDays),
+      followUpDays: Number(form.followUpDays),
     },
   };
 }
@@ -92,6 +96,10 @@ function validate(form: FormState): Errors {
   const alertDays = Number(form.alertDays);
   if (form.alertDays.trim() === '' || !Number.isInteger(alertDays) || alertDays < 0 || alertDays > MAX_ALERT_DAYS) {
     errors.alertDays = `De 0 a ${MAX_ALERT_DAYS} dias.`;
+  }
+  const followUpDays = Number(form.followUpDays);
+  if (form.followUpDays.trim() === '' || !Number.isInteger(followUpDays) || followUpDays < 0 || followUpDays > MAX_ALERT_DAYS) {
+    errors.followUpDays = `De 0 a ${MAX_ALERT_DAYS} dias.`;
   }
   if (form.terms.length === 0) errors.terms = 'Informe ao menos uma condição de pagamento.';
   const seen = new Set<string>();
@@ -380,6 +388,25 @@ function SettingsForm({ initial, onSaved }: { initial: Settings; onSaved: () => 
               <p className={formStyles.error}>{errors.alertDays}</p>
             ) : (
               <span className={styles.hint}>Pendentes e enviados aparecem como “vencendo” no dashboard e na lista.</span>
+            )}
+          </label>
+          <label className={formStyles.field}>
+            <span className={formStyles.label}>Lembrete de retorno (dias após o envio) *</span>
+            <input
+              type="number"
+              min={0}
+              max={MAX_ALERT_DAYS}
+              step={1}
+              inputMode="numeric"
+              className={formStyles.input}
+              value={form.followUpDays}
+              onChange={(e) => change((prev) => ({ ...prev, followUpDays: e.target.value }))}
+              aria-invalid={Boolean(errors.followUpDays)}
+            />
+            {errors.followUpDays ? (
+              <p className={formStyles.error}>{errors.followUpDays}</p>
+            ) : (
+              <span className={styles.hint}>Enviados sem resposta há esse tempo aparecem no sininho para o vendedor retornar. 0 desliga.</span>
             )}
           </label>
 

@@ -86,6 +86,26 @@ export async function quotesExpiringWithin(days: number, access: Access): Promis
   return rows.map(toQuote);
 }
 
+/**
+ * Enviados há `days` dias ou mais (dia de São Paulo do último envio), com esse dia.
+ * Os já vencidos ficam de fora; a regra fina fica em src/lib/notifications.ts.
+ */
+export async function quotesAwaitingReply(days: number, access: Access): Promise<{ quotes: Quote[]; sentOn: Map<string, string> }> {
+  const rows = await db().query(
+    `select ${LIST_COLUMNS}, to_char(s.sent_on, 'YYYY-MM-DD') as sent_on from quotes
+     join lateral (
+       select max((e.at at time zone '${TZ}')::date) as sent_on from quote_events e
+       where e.quote_id = quotes.id and e.status = 'Enviado'
+     ) s on true
+     where status = 'Enviado'
+       and valid_until >= (now() at time zone '${TZ}')::date
+       and s.sent_on <= (now() at time zone '${TZ}')::date - $1::int
+       and ($2::bigint is null or seller_id = $2::bigint)`,
+    [days, ownSellerId(access)],
+  );
+  return { quotes: rows.map(toQuote), sentOn: new Map(rows.map((row) => [row.id as string, row.sent_on as string])) };
+}
+
 /** Orçamento de outro vendedor responde como inexistente para quem só vê os seus. */
 export async function getQuote(id: string, access: Access): Promise<QuoteDetail> {
   const [row] = await db().query(

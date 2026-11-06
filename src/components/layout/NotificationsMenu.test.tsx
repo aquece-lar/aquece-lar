@@ -105,13 +105,13 @@ describe('NotificationsMenu', () => {
     await user.click(within(panel).getByRole('button', { name: 'Limpar todas' }));
     await user.click(within(panel).getByRole('button', { name: 'Limpar' }));
     expect(dismissNotifications).toHaveBeenCalledWith('all');
-    expect(await within(panel).findByText('Nenhum orçamento vencendo por agora.')).toBeInTheDocument();
+    expect(await within(panel).findByText('Nenhum aviso por agora.')).toBeInTheDocument();
   });
 
   it('mostra quando não há nada vencendo', async () => {
     listNotifications.mockResolvedValue([]);
     const user = renderMenu();
     await user.click(await screen.findByRole('button', { name: 'Notificações' }));
-    expect(screen.getByText('Nenhum orçamento vencendo por agora.')).toBeInTheDocument();
+    expect(screen.getByText('Nenhum aviso por agora.')).toBeInTheDocument();
   });
 });

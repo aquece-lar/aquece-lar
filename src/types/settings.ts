@@ -23,6 +23,8 @@ export interface QuoteDefaults {
   maxDiscountPercent: number | null;
   /** Quantos dias antes do vencimento um orçamento em aberto aparece como "vencendo". */
   expiryAlertDays: number;
+  /** Dias depois do envio sem resposta para lembrar de falar com o cliente; 0 desliga. */
+  followUpDays: number;
 }
 
 export interface Settings {

@@ -10,7 +10,9 @@ import styles from './Topbar.module.css';
 /** Busca de novo a cada 5 minutos e ao voltar para a aba. */
 const REFRESH_MS = 5 * 60 * 1000;
 
-function daysLabel(days: number): string {
+function daysLabel(n: Notification): string {
+  const { days } = n.quote;
+  if (n.kind === 'quote_follow_up') return 'Retornar';
   if (days === 0) return 'Venc. hoje';
   return days === 1 ? '1 dia' : `${days} dias`;
 }
@@ -22,9 +24,9 @@ function NoticeText({ n }: { n: Notification }) {
         <span className={styles.noticeTitle}>{n.title}</span>
         <span className={styles.noticeMessage}>{n.message}</span>
       </span>
-      <span className={styles.noticeDays}>
-        {n.quote.days > 0 && <Icon name="clock" size={12} />}
-        {daysLabel(n.quote.days)}
+      <span className={`${styles.noticeDays} ${n.kind === 'quote_follow_up' ? styles.noticeFollowUp : ''}`}>
+        {n.kind === 'quote_follow_up' ? <Icon name="chat" size={12} /> : n.quote.days > 0 && <Icon name="clock" size={12} />}
+        {daysLabel(n)}
       </span>
     </>
   );
@@ -155,7 +157,7 @@ export function NotificationsMenu() {
           <div className={`${styles.userMenuHead} ${styles.noticeHead}`}>
             <span className={styles.noticeHeadText}>
               <span className={styles.userMenuName}>Avisos</span>
-              <span className={styles.userMenuEmail}>Orçamentos em aberto perto de vencer</span>
+              <span className={styles.userMenuEmail}>Vencimentos e retornos</span>
             </span>
             {hasItems && !confirmingAll && (
               <span className={styles.noticeActions}>
@@ -203,7 +205,7 @@ export function NotificationsMenu() {
           {items === null ? (
             <p className={styles.noticeEmpty}>Carregando…</p>
           ) : items.length === 0 ? (
-            <p className={styles.noticeEmpty}>Nenhum orçamento vencendo por agora.</p>
+            <p className={styles.noticeEmpty}>Nenhum aviso por agora.</p>
           ) : (
             <ul className={styles.noticeList}>
               {items.map((n) => (

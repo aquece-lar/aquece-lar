@@ -2,7 +2,7 @@ import { buildNotifications } from '@/lib/notifications';
 import type { Notification } from '@/types/notifications';
 import { api, USE_MOCKS } from './http';
 import { mockOwnSeller } from './mockSession';
-import { quotesSnapshot } from './quotesService';
+import { quotesSnapshot, sentOnSnapshot } from './quotesService';
 import { getSettings } from './settingsService';
 
 /** Modo fictício: avisos excluídos até a página ser recarregada. */
@@ -12,7 +12,8 @@ async function mockAll(signal?: AbortSignal): Promise<Notification[]> {
   const settings = await getSettings(signal);
   const own = mockOwnSeller();
   const quotes = own === null ? quotesSnapshot() : quotesSnapshot().filter((q) => q.seller === own);
-  return buildNotifications(quotes, settings.quotes.expiryAlertDays);
+  const { expiryAlertDays, followUpDays } = settings.quotes;
+  return buildNotifications(quotes, expiryAlertDays, undefined, { days: followUpDays, sentOn: sentOnSnapshot() });
 }
 
 /** Avisos de quem está conectado, menos os excluídos: pela API, ou no modo fictício com a mesma regra de `src/lib/notifications.ts`. */

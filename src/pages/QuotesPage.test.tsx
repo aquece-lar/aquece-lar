@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { QuotesPage } from './QuotesPage';
 
 function tabCount(status: string): number {
@@ -10,6 +10,36 @@ function tabCount(status: string): number {
 }
 
 const cancelledCount = () => tabCount('Cancelado');
+
+describe('exportar', () => {
+  it('baixa a lista filtrada numa planilha', async () => {
+    const blobs: Blob[] = [];
+    const create = vi.fn((blob: Blob) => {
+      blobs.push(blob);
+      return 'blob:planilha';
+    });
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: vi.fn() });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuotesPage />
+      </MemoryRouter>,
+    );
+    await screen.findByRole('region', { name: 'Lista de orçamentos' });
+    await user.click(screen.getByRole('button', { name: /^Aprovado · \d+$/ }));
+    const approved = tabCount('Aprovado');
+
+    await user.click(screen.getByRole('button', { name: 'Exportar' }));
+    expect(click).toHaveBeenCalledOnce();
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toMatch(/^orcamentos_\d{4}-\d{2}-\d{2}_a_\d{4}-\d{2}-\d{2}_aprovados\.csv$/);
+    const lines = (await blobs[0]!.text()).replace(/^﻿/, '').trim().split('\r\n');
+    expect(lines[0]).toBe('Nº;Cliente;Vendedor;Status;Valor (R$);Criado em;Validade');
+    expect(lines).toHaveLength(approved + 1);
+    expect(lines.slice(1).every((line) => line.includes(';Aprovado;'))).toBe(true);
+    click.mockRestore();
+  });
+});
 
 describe('cancelar em lote na lista', () => {
   it('cancela os marcados, que continuam na lista como cancelados', async () => {

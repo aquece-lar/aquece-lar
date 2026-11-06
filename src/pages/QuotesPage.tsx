@@ -11,7 +11,8 @@ import { matches, useList } from '@/features/people/useList';
 import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
 import checkStyles from '@/features/settings/UserForm.module.css';
 import { useSettings } from '@/features/settings/useSettings';
-import { formatBRL, formatBRLRounded, formatDateTime, toISODate } from '@/lib/format';
+import { formatBRL, formatBRLRounded, formatDate, formatDateTime, toISODate } from '@/lib/format';
+import { downloadText, toSpreadsheet } from '@/lib/spreadsheet';
 import { cancelQuotes, deleteCancelledQuotes, listQuotes, reopenQuotes } from '@/services/quotesService';
 import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote } from '@/types/quotes';
@@ -64,6 +65,16 @@ function SelectBox({ label, checked, onChange }: { label: string; checked: boole
       </span>
     </label>
   );
+}
+
+/** Baixa a lista como está na tela (período, busca e status) numa planilha. */
+function exportQuotes(quotes: readonly Quote[], period: Period, filter: StatusFilter) {
+  const csv = toSpreadsheet(
+    ['Nº', 'Cliente', 'Vendedor', 'Status', 'Valor (R$)', 'Criado em', 'Validade'],
+    quotes.map((q) => [q.number, q.customer, q.seller, q.status, q.amount, formatDateTime(q.createdAt), formatDate(q.validUntil)]),
+  );
+  const status = filter === 'todos' ? '' : `_${filter.toLowerCase()}s`;
+  downloadText(`orcamentos_${period.from}_a_${period.to}${status}.csv`, csv);
 }
 
 function QuoteActions({ quote }: { quote: Quote }) {
@@ -207,6 +218,16 @@ export function QuotesPage() {
         </div>
         <div className={styles.headActions}>
           <PeriodFilter value={period} onChange={resetting(setPeriod)} />
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => exportQuotes(quotes, period, filter)}
+            disabled={quotes.length === 0}
+            title="Baixa a lista como está na tela, para abrir no Excel"
+          >
+            <Icon name="sheet" size={16} />
+            Exportar
+          </button>
           <Link to="/orcamentos/novo" className="btn btn-primary">
             <Icon name="plus" size={16} />
             Novo orçamento

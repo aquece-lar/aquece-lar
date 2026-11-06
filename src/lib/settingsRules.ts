@@ -22,5 +22,9 @@ export function settingsProblem(next: Settings): string | null {
   if (!Number.isInteger(alert) || alert < 0 || alert > MAX_ALERT_DAYS) {
     return `O aviso de vencimento deve ser de 0 a ${MAX_ALERT_DAYS} dias.`;
   }
+  const followUp = next.quotes.followUpDays;
+  if (!Number.isInteger(followUp) || followUp < 0 || followUp > MAX_ALERT_DAYS) {
+    return `O lembrete de retorno deve ser de 0 a ${MAX_ALERT_DAYS} dias.`;
+  }
   return null;
 }

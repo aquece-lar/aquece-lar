@@ -2,6 +2,7 @@ import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote, QuoteDetail, QuoteDraft, QuoteEvent } from '@/types/quotes';
 import { can, discountOverLimit } from '@/lib/access';
 import { describeQuoteChanges } from '@/lib/changes';
+import { toISODate } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
 import { api, ApiError, USE_MOCKS } from './http';
 import { InvalidPeriodError, inPeriod, validatePeriod } from './period';
@@ -78,6 +79,16 @@ function ownQuote(id: string): Quote {
     throw new ApiError(403, 'forbidden', 'Este orçamento é de outro vendedor.');
   }
   return quote;
+}
+
+/** Modo fictício: dia (YYYY-MM-DD) do último envio de cada orçamento que já foi enviado. */
+export function sentOnSnapshot(): Map<string, string> {
+  const sentOn = new Map<string, string>();
+  for (const [id, events] of history) {
+    const sent = events.filter((e) => e.status === 'Enviado').at(-1);
+    if (sent) sentOn.set(id, toISODate(new Date(sent.at)));
+  }
+  return sentOn;
 }
 
 /** Orçamentos criados no período, do mais recente para o mais antigo. */

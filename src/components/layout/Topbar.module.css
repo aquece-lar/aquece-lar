@@ -240,6 +240,12 @@
 }
 
 /* Mesmo selo do aviso de vencimento das listas. */
+/* Retorno ao cliente: lembrete, não urgência. */
+.noticeDays.noticeFollowUp {
+  border-color: var(--info);
+  color: var(--info);
+}
+
 .noticeDays {
   flex: none;
   display: inline-flex;

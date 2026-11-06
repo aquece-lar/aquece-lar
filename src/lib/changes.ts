@@ -96,6 +96,8 @@ export function describeSettingsChanges(before: Settings, after: Settings): stri
   const limit = (n: number | null) => (n === null ? 'sem limite' : percent(n));
   diff(changes, 'desconto máximo', limit(q.maxDiscountPercent), limit(r.maxDiscountPercent));
   diff(changes, 'aviso de vencimento', days(q.expiryAlertDays), days(r.expiryAlertDays));
+  const followUp = (n: number) => (n === 0 ? 'desligado' : days(n));
+  diff(changes, 'lembrete de retorno', followUp(q.followUpDays), followUp(r.followUpDays));
   return join(changes);
 }
 
