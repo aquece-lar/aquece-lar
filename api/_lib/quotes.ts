@@ -306,6 +306,47 @@ export async function deleteCancelledQuotes(ids: readonly string[], me: Caller):
   return { deleted: rows.length };
 }
 
+/**
+ * Cancela em lote os pendentes e enviados entre `ids`, ou (`remove`) já apaga de vez.
+ * O vendedor só mexe nos próprios; os de outro status ou de outro vendedor ficam como estão.
+ */
+export async function cancelQuotes(
+  ids: readonly string[],
+  remove: boolean,
+  me: Caller,
+): Promise<{ cancelled: number; deleted: number }> {
+  if (remove && !can(me.access, 'deleteRecords')) throw forbidden();
+  const seller = me.access.role === 'Vendedor' ? (me.access.sellerId ?? '0') : null;
+  if (remove) {
+    const rows = await db()`
+      delete from quotes
+      where id = any(${ids}::bigint[]) and status in ('Pendente', 'Enviado')
+        and (${seller}::bigint is null or seller_id = ${seller}::bigint)
+      returning number, customer_name`;
+    if (rows.length === 1) {
+      const [row] = rows;
+      await logActivity(me, 'Orçamentos', `Orçamento #${row!.number as number} cancelado e excluído`, row!.customer_name as string);
+    } else if (rows.length > 1) {
+      const numbers = rows.map((row) => `#${row.number as number}`).sort().join(', ');
+      await logActivity(me, 'Orçamentos', `${rows.length} orçamentos cancelados e excluídos`, numbers);
+    }
+    return { cancelled: rows.length, deleted: rows.length };
+  }
+  const rows = await db()`
+    with q as (
+      update quotes set status = 'Cancelado'
+      where id = any(${ids}::bigint[]) and status in ('Pendente', 'Enviado')
+        and (${seller}::bigint is null or seller_id = ${seller}::bigint)
+      returning id
+    ),
+    e as (
+      insert into quote_events (quote_id, status, note, user_id, user_name)
+      select id, 'Cancelado', 'Orçamento cancelado', ${me.id}::bigint, ${me.session.name} from q
+    )
+    select id from q`;
+  return { cancelled: rows.length, deleted: 0 };
+}
+
 /** Um orçamento: só se estiver cancelado. */
 export async function deleteQuote(id: string, me: Caller): Promise<void> {
   const status = await currentStatus(id, me.access);

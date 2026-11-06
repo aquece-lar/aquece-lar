@@ -406,6 +406,11 @@
   color: var(--text-2);
 }
 
+/* Cancelar em lote: mesma faixa, sem o tom de alerta. */
+.bulkNeutral {
+  background: var(--subtle);
+}
+
 .bulkDanger {
   color: var(--err);
 }

@@ -10,6 +10,7 @@ import { ApiError, errorResponse, json, noContent, readBody } from './http.js';
 import { ensureSchema } from './migrate.js';
 import { createProduct, deleteProduct, listProducts, updateProduct } from './products.js';
 import {
+  cancelQuotes,
   changeStatus,
   createQuote,
   deleteCancelledQuotes,
@@ -108,6 +109,13 @@ export async function handle(request: Request, path: string): Promise<Response> 
 
     // Todo o resto exige sessão.
     const me = await caller(request);
+
+    // Cancelar em lote: `{ ids, delete? }`; com `delete`, já apaga de vez.
+    if (resource === 'quotes' && id === 'cancel' && !action && rest.length === 0) {
+      if (method !== 'POST') throw METHOD_NOT_ALLOWED;
+      const body = await readBody(request);
+      return json(await cancelQuotes(readQuoteIds(body), body.delete === true, me));
+    }
 
     // Ids são numéricos; qualquer outra coisa não existe.
     if (rest.length > 0 || (id !== undefined && !/^\d+$/.test(id))) throw new ApiError(404, 'not_found', 'Rota não encontrada.');

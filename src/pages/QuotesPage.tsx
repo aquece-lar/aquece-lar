@@ -12,7 +12,7 @@ import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
 import checkStyles from '@/features/settings/UserForm.module.css';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatBRLRounded, formatDateTime, toISODate } from '@/lib/format';
-import { deleteCancelledQuotes, listQuotes } from '@/services/quotesService';
+import { cancelQuotes, deleteCancelledQuotes, listQuotes } from '@/services/quotesService';
 import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote } from '@/types/quotes';
 import styles from './ListPage.module.css';
@@ -21,6 +21,23 @@ type StatusFilter = 'todos' | QuoteStatus;
 
 const STATUSES: QuoteStatus[] = ['Pendente', 'Enviado', 'Aprovado', 'Cancelado'];
 const PAGE_SIZE = 15;
+/** Só estes podem ser cancelados. */
+const CANCELLABLE: QuoteStatus[] = ['Pendente', 'Enviado'];
+
+/** Ação em lote sendo confirmada. */
+type BulkAction = 'delete-selected' | 'delete-all' | 'cancel' | 'cancel-delete';
+
+const MODAL_TITLES: Record<BulkAction, string> = {
+  'delete-selected': 'Excluir selecionados',
+  'delete-all': 'Excluir todos os cancelados',
+  cancel: 'Cancelar orçamentos',
+  'cancel-delete': 'Cancelar e apagar',
+};
+
+/** `many` com # no lugar do número. */
+function plural(n: number, one: string, many: string): string {
+  return n === 1 ? one : many.replace('#', String(n));
+}
 
 function defaultPeriod(): Period {
   const now = new Date();
@@ -72,11 +89,12 @@ export function QuotesPage() {
   const [page, setPage] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
   const canDelete = useCan('deleteRecords');
-  /** Qual exclusão está sendo confirmada: só os marcados ou todos os cancelados da lista. */
-  const [confirmingDelete, setConfirmingDelete] = useState<'selected' | 'all' | null>(null);
+  const [confirming, setConfirming] = useState<BulkAction | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
+  const [working, setWorking] = useState(false);
+  const [bulkError, setBulkError] = useState('');
+  /** Resultado da última ação em lote, quando nem todos os marcados puderam ser alterados. */
+  const [notice, setNotice] = useState('');
 
   const { from, to } = period;
   const load = useCallback((signal: AbortSignal) => listQuotes({ from, to }, signal), [from, to]);
@@ -111,11 +129,20 @@ export function QuotesPage() {
   const total = quotes.reduce((sum, q) => sum + q.amount, 0);
 
   // Com o filtro "Cancelado", dá para apagar de vez os marcados ou todos da lista (período e busca atuais).
-  const cancelled = filter === 'Cancelado' ? quotes : [];
-  const selecting = canDelete && cancelled.length > 0;
-  const picked = cancelled.filter((q) => selected.has(q.id)).map((q) => q.id);
-  const toDelete = confirmingDelete === 'all' ? cancelled.map((q) => q.id) : picked;
-  const pageAllPicked = visible.length > 0 && visible.every((q) => selected.has(q.id));
+  // Nos outros filtros, marcam-se pendentes e enviados para cancelar, ou cancelar e já apagar.
+  const deleteMode = filter === 'Cancelado';
+  const selectable = (q: Quote) => (deleteMode ? canDelete : CANCELLABLE.includes(q.status));
+  const candidates = quotes.filter(selectable);
+  const selecting = candidates.length > 0;
+  const picked = candidates.filter((q) => selected.has(q.id)).map((q) => q.id);
+  const targets = confirming === 'delete-all' ? candidates.map((q) => q.id) : picked;
+  const pageCandidates = visible.filter(selectable);
+  const pageAllPicked = pageCandidates.length > 0 && pageCandidates.every((q) => selected.has(q.id));
+
+  function ask(action: BulkAction) {
+    setBulkError('');
+    setConfirming(action);
+  }
 
   function pick(ids: readonly string[], on: boolean) {
     setSelected((prev) => {
@@ -128,19 +155,28 @@ export function QuotesPage() {
     });
   }
 
-  async function removeCancelled() {
-    setDeleting(true);
-    setDeleteError('');
+  async function runBulk() {
+    if (!confirming) return;
+    setWorking(true);
+    setBulkError('');
     try {
-      await deleteCancelledQuotes(toDelete);
-      setConfirmingDelete(null);
+      const done = confirming.startsWith('delete')
+        ? await deleteCancelledQuotes(targets)
+        : await cancelQuotes(targets, { remove: confirming === 'cancel-delete' });
+      const skipped = targets.length - done;
+      setNotice(
+        skipped > 0
+          ? `${plural(skipped, '1 orçamento não pôde ser alterado', '# orçamentos não puderam ser alterados')} (mudou o status ou é de outro vendedor).`
+          : '',
+      );
+      setConfirming(null);
       setSelected(new Set());
       setPage(0);
       setReloadKey((k) => k + 1);
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : 'Não foi possível excluir os orçamentos.');
+      setBulkError(error instanceof Error ? error.message : 'Não foi possível concluir. Tente novamente.');
     } finally {
-      setDeleting(false);
+      setWorking(false);
     }
   }
 
@@ -150,6 +186,7 @@ export function QuotesPage() {
       setter(value);
       setPage(0);
       setSelected(new Set());
+      setNotice('');
     };
   }
 
@@ -205,35 +242,58 @@ export function QuotesPage() {
           />
 
           {selecting && (
-            <div className={styles.bulkBar}>
+            <div className={`${styles.bulkBar} ${deleteMode ? '' : styles.bulkNeutral}`}>
               <span>
                 {picked.length > 0
                   ? `${picked.length} ${picked.length === 1 ? 'selecionado' : 'selecionados'}`
-                  : 'Marque os que quer apagar de vez, ou apague todos.'}
+                  : notice ||
+                    (deleteMode
+                      ? 'Marque os que quer apagar de vez, ou apague todos.'
+                      : 'Marque pendentes ou enviados para cancelar.')}
               </span>
               <span className={styles.bulkActions}>
-                <button
-                  type="button"
-                  className={`btn btn-secondary ${styles.bulkDanger}`}
-                  disabled={picked.length === 0}
-                  onClick={() => {
-                    setDeleteError('');
-                    setConfirmingDelete('selected');
-                  }}
-                >
-                  <Icon name="trash" size={16} />
-                  Excluir selecionados ({picked.length})
-                </button>
-                <button
-                  type="button"
-                  className={`btn btn-secondary ${styles.bulkDanger}`}
-                  onClick={() => {
-                    setDeleteError('');
-                    setConfirmingDelete('all');
-                  }}
-                >
-                  Excluir todos ({cancelled.length})
-                </button>
+                {deleteMode ? (
+                  <>
+                    <button
+                      type="button"
+                      className={`btn btn-secondary ${styles.bulkDanger}`}
+                      disabled={picked.length === 0}
+                      onClick={() => ask('delete-selected')}
+                    >
+                      <Icon name="trash" size={16} />
+                      Excluir selecionados ({picked.length})
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn btn-secondary ${styles.bulkDanger}`}
+                      onClick={() => ask('delete-all')}
+                    >
+                      Excluir todos ({candidates.length})
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      disabled={picked.length === 0}
+                      onClick={() => ask('cancel')}
+                    >
+                      Cancelar ({picked.length})
+                    </button>
+                    {canDelete && (
+                      <button
+                        type="button"
+                        className={`btn btn-secondary ${styles.bulkDanger}`}
+                        disabled={picked.length === 0}
+                        onClick={() => ask('cancel-delete')}
+                      >
+                        <Icon name="trash" size={16} />
+                        Cancelar e apagar ({picked.length})
+                      </button>
+                    )}
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -251,7 +311,7 @@ export function QuotesPage() {
                           <SelectBox
                             label="Selecionar todos desta página"
                             checked={pageAllPicked}
-                            onChange={(on) => pick(visible.map((q) => q.id), on)}
+                            onChange={(on) => pick(pageCandidates.map((q) => q.id), on)}
                           />
                         </th>
                       )}
@@ -273,11 +333,13 @@ export function QuotesPage() {
                       <tr key={quote.id} className={styles.row}>
                         {selecting && (
                           <td className={styles.selectCell}>
-                            <SelectBox
-                              label={`Selecionar ${quote.number}`}
-                              checked={selected.has(quote.id)}
-                              onChange={(on) => pick([quote.id], on)}
-                            />
+                            {selectable(quote) && (
+                              <SelectBox
+                                label={`Selecionar ${quote.number}`}
+                                checked={selected.has(quote.id)}
+                                onChange={(on) => pick([quote.id], on)}
+                              />
+                            )}
                           </td>
                         )}
                         <td className={styles.name}>{quote.number}</td>
@@ -305,7 +367,7 @@ export function QuotesPage() {
                   <li key={quote.id} className={styles.itemCard}>
                     <div className={styles.cardTop}>
                       <span className={styles.cardNumber}>
-                        {selecting && (
+                        {selecting && selectable(quote) && (
                           <SelectBox
                             label={`Selecionar ${quote.number}`}
                             checked={selected.has(quote.id)}
@@ -367,27 +429,36 @@ export function QuotesPage() {
       ) : null}
 
       <Modal
-        open={confirmingDelete !== null}
-        title={confirmingDelete === 'all' ? 'Excluir todos os cancelados' : 'Excluir selecionados'}
-        onClose={() => setConfirmingDelete(null)}
+        open={confirming !== null}
+        title={confirming ? MODAL_TITLES[confirming] : ''}
+        onClose={() => setConfirming(null)}
         size="sm"
       >
         <p className={formStyles.text}>
-          Excluir de vez {toDelete.length === 1 ? 'o orçamento cancelado' : `os ${toDelete.length} orçamentos cancelados`}
-          {confirmingDelete === 'all' ? ' desta lista' : ' selecionados'}, com o histórico? Esta ação não pode ser desfeita.
+          {confirming === 'cancel'
+            ? `Cancelar ${plural(targets.length, 'o orçamento selecionado? Ele continua na lista, como cancelado.', 'os # orçamentos selecionados? Eles continuam na lista, como cancelados.')}`
+            : confirming === 'cancel-delete'
+              ? `Cancelar e apagar de vez ${plural(targets.length, 'o orçamento selecionado', 'os # orçamentos selecionados')}, com o histórico? Esta ação não pode ser desfeita.`
+              : `Excluir de vez ${plural(targets.length, 'o orçamento cancelado', 'os # orçamentos cancelados')}${confirming === 'delete-all' ? ' desta lista' : ' selecionados'}, com o histórico? Esta ação não pode ser desfeita.`}
         </p>
-        {deleteError && (
+        {bulkError && (
           <p className={formStyles.error} role="alert">
-            {deleteError}
+            {bulkError}
           </p>
         )}
         <div className={formStyles.actions}>
-          <button type="button" className="btn btn-secondary" onClick={() => setConfirmingDelete(null)} disabled={deleting}>
+          <button type="button" className="btn btn-secondary" onClick={() => setConfirming(null)} disabled={working}>
             Voltar
           </button>
-          <button type="button" className={`btn ${formStyles.dangerBtn}`} onClick={() => void removeCancelled()} disabled={deleting}>
-            {deleting ? 'Excluindo…' : `Excluir ${toDelete.length}`}
-          </button>
+          {confirming === 'cancel' ? (
+            <button type="button" className="btn btn-primary" onClick={() => void runBulk()} disabled={working}>
+              {working ? 'Cancelando…' : `Cancelar ${targets.length}`}
+            </button>
+          ) : (
+            <button type="button" className={`btn ${formStyles.dangerBtn}`} onClick={() => void runBulk()} disabled={working}>
+              {working ? 'Excluindo…' : confirming === 'cancel-delete' ? `Apagar ${targets.length}` : `Excluir ${targets.length}`}
+            </button>
+          )}
         </div>
       </Modal>
     </>

@@ -3,6 +3,7 @@ import { toISODate } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
 import type { QuoteDraft } from '@/types/quotes';
 import {
+  cancelQuotes,
   createQuote,
   deleteCancelledQuotes,
   deleteQuote,
@@ -126,5 +127,18 @@ describe('excluir orçamentos', () => {
     expect(deleted).toBe(2);
     expect(quotesSnapshot().some((q) => q.id === approved.id)).toBe(true);
     expect(quotesSnapshot().some((q) => cancelled.some((c) => c.id === q.id))).toBe(false);
+  });
+
+  it('cancela em lote só pendentes e enviados; com remove, já apaga', async () => {
+    const pending = quotesSnapshot().find((q) => q.status === 'Pendente')!;
+    const sent = quotesSnapshot().find((q) => q.status === 'Enviado')!;
+    const approved = quotesSnapshot().find((q) => q.status === 'Aprovado')!;
+    expect(await cancelQuotes([pending.id, approved.id])).toBe(1);
+    expect(quotesSnapshot().find((q) => q.id === pending.id)!.status).toBe('Cancelado');
+    expect(quotesSnapshot().find((q) => q.id === approved.id)!.status).toBe('Aprovado');
+
+    expect(await cancelQuotes([sent.id, pending.id], { remove: true })).toBe(1);
+    expect(quotesSnapshot().some((q) => q.id === sent.id)).toBe(false);
+    expect(quotesSnapshot().some((q) => q.id === pending.id)).toBe(true);
   });
 });

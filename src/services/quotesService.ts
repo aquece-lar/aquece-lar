@@ -192,6 +192,39 @@ export async function deleteQuote(id: string): Promise<void> {
   });
 }
 
+const CANCELLABLE: readonly QuoteStatus[] = ['Pendente', 'Enviado'];
+
+/**
+ * Cancela os pendentes e enviados entre `ids` (os outros ficam), ou com `remove` já apaga de vez.
+ * Devolve quantos foram cancelados.
+ */
+export async function cancelQuotes(ids: readonly string[], { remove = false } = {}): Promise<number> {
+  if (!USE_MOCKS) {
+    return (await api<{ cancelled: number }>('POST', '/quotes/cancel', { ids, delete: remove })).cancelled;
+  }
+  return fromMock(() => {
+    if (remove) mockEnsure('deleteRecords');
+    const access = mockAccess();
+    const hit = new Set(
+      quotes
+        .filter((q) => ids.includes(q.id) && CANCELLABLE.includes(q.status))
+        .filter((q) => access.role !== 'Vendedor' || q.seller === access.sellerName)
+        .map((q) => q.id),
+    );
+    if (remove) {
+      quotes = quotes.filter((q) => !hit.has(q.id));
+      for (const id of hit) history.delete(id);
+    } else {
+      const at = new Date().toISOString();
+      quotes = quotes.map((q) => (hit.has(q.id) ? { ...q, status: 'Cancelado' } : q));
+      for (const id of hit) {
+        history.set(id, [...(history.get(id) ?? []), { status: 'Cancelado', at, note: STATUS_NOTES.Cancelado, by: mockUserName(), detail: '' }]);
+      }
+    }
+    return hit.size;
+  });
+}
+
 /** Apaga de vez os cancelados entre `ids` (os de outro status ficam); devolve quantos saíram. */
 export async function deleteCancelledQuotes(ids: readonly string[]): Promise<number> {
   if (!USE_MOCKS) return (await api<{ deleted: number }>('DELETE', '/quotes', { ids })).deleted;
