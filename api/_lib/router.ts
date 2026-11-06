@@ -5,7 +5,7 @@ import { caller, currentUser, forbidden, login, logout } from './auth.js';
 import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
 import { getDashboard } from './dashboard.js';
 import { db } from './db.js';
-import { listNotifications } from './notifications.js';
+import { dismissNotifications, listNotifications } from './notifications.js';
 import { ApiError, errorResponse, json, noContent, readBody } from './http.js';
 import { ensureSchema } from './migrate.js';
 import { createProduct, deleteProduct, listProducts, updateProduct } from './products.js';
@@ -101,8 +101,9 @@ export async function handle(request: Request, path: string): Promise<Response> 
     }
 
     if (resource === 'notifications' && !id) {
-      if (method !== 'GET') throw METHOD_NOT_ALLOWED;
-      return json(await listNotifications(me.access));
+      if (method === 'GET') return json(await listNotifications(me));
+      if (method === 'DELETE') return json(await dismissNotifications(await readBody(request), me));
+      throw METHOD_NOT_ALLOWED;
     }
 
     if (resource === 'settings' && !id) {

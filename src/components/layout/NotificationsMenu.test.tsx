@@ -6,10 +6,12 @@ import type { Notification } from '@/types/notifications';
 import { NotificationsMenu } from './NotificationsMenu';
 
 const listNotifications = vi.hoisted(() => vi.fn<() => Promise<Notification[]>>());
+const dismissNotifications = vi.hoisted(() => vi.fn<(ids: readonly string[] | 'all') => Promise<void>>());
 
 vi.mock('@/services/notificationsService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/services/notificationsService')>()),
   listNotifications,
+  dismissNotifications,
 }));
 
 function notification(id: string, days: number): Notification {
@@ -23,7 +25,10 @@ function notification(id: string, days: number): Notification {
   };
 }
 
-beforeEach(() => listNotifications.mockReset());
+beforeEach(() => {
+  listNotifications.mockReset();
+  dismissNotifications.mockReset().mockResolvedValue(undefined);
+});
 afterEach(() => window.localStorage.clear());
 
 function renderMenu() {
@@ -63,6 +68,44 @@ describe('NotificationsMenu', () => {
     listNotifications.mockResolvedValue([notification('1142', 0), notification('1150', 1)]);
     window.dispatchEvent(new Event('focus'));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Notificações, 1 nova' })).toBeInTheDocument());
+  });
+
+  it('seleciona e exclui só os marcados', async () => {
+    const a = notification('1142', 0);
+    const b = notification('1147', 2);
+    listNotifications.mockResolvedValue([a, b]);
+    const user = renderMenu();
+    await user.click(await screen.findByRole('button', { name: /Notificações/ }));
+    const panel = screen.getByRole('dialog', { name: 'Avisos' });
+
+    await user.click(within(panel).getByRole('button', { name: 'Selecionar' }));
+    const remove = within(panel).getByRole('button', { name: 'Excluir selecionadas (0)' });
+    expect(remove).toBeDisabled();
+    // No modo de seleção, o aviso não abre o orçamento.
+    expect(within(panel).queryByRole('link')).not.toBeInTheDocument();
+
+    await user.click(within(panel).getByRole('checkbox', { name: 'Selecionar: #1142 vence hoje' }));
+    await user.click(within(panel).getByRole('button', { name: 'Excluir selecionadas (1)' }));
+
+    expect(dismissNotifications).toHaveBeenCalledWith([a.id]);
+    await waitFor(() => expect(within(panel).queryByText('#1142 vence hoje')).not.toBeInTheDocument());
+    expect(within(panel).getByRole('link', { name: /#1147 vence em 2 dias/ })).toBeInTheDocument();
+  });
+
+  it('limpa todas depois de confirmar', async () => {
+    listNotifications.mockResolvedValue([notification('1142', 0), notification('1147', 2)]);
+    const user = renderMenu();
+    await user.click(await screen.findByRole('button', { name: /Notificações/ }));
+    const panel = screen.getByRole('dialog', { name: 'Avisos' });
+
+    await user.click(within(panel).getByRole('button', { name: 'Limpar todas' }));
+    await user.click(within(panel).getByRole('button', { name: 'Cancelar' }));
+    expect(dismissNotifications).not.toHaveBeenCalled();
+
+    await user.click(within(panel).getByRole('button', { name: 'Limpar todas' }));
+    await user.click(within(panel).getByRole('button', { name: 'Limpar' }));
+    expect(dismissNotifications).toHaveBeenCalledWith('all');
+    expect(await within(panel).findByText('Nenhum orçamento vencendo por agora.')).toBeInTheDocument();
   });
 
   it('mostra quando não há nada vencendo', async () => {

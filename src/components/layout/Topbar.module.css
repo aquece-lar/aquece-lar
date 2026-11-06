@@ -140,6 +140,105 @@
   white-space: nowrap;
 }
 
+/* Mais específico que .userMenuHead (definido depois neste arquivo). */
+.userMenuHead.noticeHead {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.noticeHeadText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.noticeActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+/* Ações em texto no cabeçalho do painel (não competem com os avisos). */
+.noticeLink {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.noticeLink:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.noticeLink:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.noticeDanger {
+  color: var(--err);
+}
+
+.noticeConfirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0 4px 6px;
+  padding: 10px;
+  border-radius: 7px;
+  background: var(--err-bg);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.noticeConfirm .noticeActions {
+  justify-content: flex-end;
+}
+
+.noticeSelectable {
+  justify-content: flex-start;
+  cursor: pointer;
+}
+
+.noticeSelectable .noticeText {
+  flex: 1;
+}
+
+.noticeCheck {
+  padding: 0;
+  flex: none;
+}
+
+.noticeCheck input {
+  top: 0;
+}
+
+.noticeError {
+  margin: 4px 10px;
+  font-size: 12px;
+  color: var(--err);
+}
+
+.noticeFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 4px 2px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.noticeDeleteBtn {
+  color: var(--err);
+}
+
 /* Mesmo selo do aviso de vencimento das listas. */
 .noticeDays {
   flex: none;
