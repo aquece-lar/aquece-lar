@@ -9,7 +9,15 @@ import { dismissNotifications, listNotifications } from './notifications.js';
 import { ApiError, errorResponse, json, noContent, readBody } from './http.js';
 import { ensureSchema } from './migrate.js';
 import { createProduct, deleteProduct, listProducts, updateProduct } from './products.js';
-import { changeStatus, createQuote, getQuote, listQuotes, updateQuote } from './quotes.js';
+import {
+  changeStatus,
+  createQuote,
+  deleteCancelledQuotes,
+  deleteQuote,
+  getQuote,
+  listQuotes,
+  updateQuote,
+} from './quotes.js';
 import { createSeller, deleteSeller, listSellers, updateSeller } from './sellers.js';
 import { getSettings, saveSettings } from './settings.js';
 import { createUser, deleteUser, listUsers, updateUser } from './users.js';
@@ -56,6 +64,15 @@ function ensure(access: Access, permission: Permission | undefined): void {
 }
 
 const METHOD_NOT_ALLOWED = new ApiError(405, 'method_not_allowed', 'Método não permitido.');
+
+/** `{ ids: ["12", "13"] }` com ids numéricos, até 500 por vez. */
+function readQuoteIds(body: Record<string, unknown>): string[] {
+  const ids = body.ids;
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 500 || ids.some((id) => typeof id !== 'string' || !/^\d+$/.test(id))) {
+    throw new ApiError(400, 'validation', 'Escolha os orçamentos a excluir.');
+  }
+  return ids as string[];
+}
 
 function period(url: URL) {
   return { from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '' };
@@ -126,6 +143,10 @@ export async function handle(request: Request, path: string): Promise<Response> 
       if (!id) {
         if (method === 'GET') return json(await listQuotes(period(url), me.access));
         if (method === 'POST') return json(await createQuote(await readBody(request), me), 201);
+        if (method === 'DELETE') {
+          ensure(me.access, 'deleteRecords');
+          return json(await deleteCancelledQuotes(readQuoteIds(await readBody(request)), me));
+        }
         throw METHOD_NOT_ALLOWED;
       }
       if (action === 'status') {
@@ -135,6 +156,11 @@ export async function handle(request: Request, path: string): Promise<Response> 
       if (action) throw new ApiError(404, 'not_found', 'Rota não encontrada.');
       if (method === 'GET') return json(await getQuote(id, me.access));
       if (method === 'PUT') return json(await updateQuote(id, await readBody(request), me));
+      if (method === 'DELETE') {
+        ensure(me.access, 'deleteRecords');
+        await deleteQuote(id, me);
+        return noContent();
+      }
       throw METHOD_NOT_ALLOWED;
     }
 

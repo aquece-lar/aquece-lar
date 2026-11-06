@@ -390,3 +390,28 @@
 .badges > :first-child {
   min-width: 8em;
 }
+
+/* Faixa acima da tabela para ações em lote (ex.: excluir cancelados). */
+.bulkBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 24px 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--err-bg);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.bulkDanger {
+  color: var(--err);
+}
+
+@media (max-width: 640px) {
+  .bulkBar {
+    margin: 0 16px 12px;
+  }
+}

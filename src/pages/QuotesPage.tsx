@@ -1,14 +1,17 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
+import { useCan } from '@/contexts/AuthContext';
 import { PeriodFilter } from '@/features/dashboard/PeriodFilter';
 import { QuoteStatusBadge } from '@/features/dashboard/QuoteStatusBadge';
+import formStyles from '@/features/people/Form.module.css';
 import { ListToolbar } from '@/features/people/ListToolbar';
+import { Modal } from '@/features/people/Modal';
 import { matches, useList } from '@/features/people/useList';
 import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatBRLRounded, formatDateTime, toISODate } from '@/lib/format';
-import { listQuotes } from '@/services/quotesService';
+import { deleteCancelledQuotes, listQuotes } from '@/services/quotesService';
 import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote } from '@/types/quotes';
 import styles from './ListPage.module.css';
@@ -49,6 +52,10 @@ export function QuotesPage() {
   const [filter, setFilter] = useState<StatusFilter>('todos');
   const [page, setPage] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const canDelete = useCan('deleteRecords');
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const { from, to } = period;
   const load = useCallback((signal: AbortSignal) => listQuotes({ from, to }, signal), [from, to]);
@@ -81,6 +88,24 @@ export function QuotesPage() {
   const current = Math.min(page, pageCount - 1);
   const visible = quotes.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
   const total = quotes.reduce((sum, q) => sum + q.amount, 0);
+
+  // Com o filtro "Cancelado", dá para apagar de vez os que estão na lista (período e busca atuais).
+  const cancelled = filter === 'Cancelado' ? quotes : [];
+
+  async function removeCancelled() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await deleteCancelledQuotes(cancelled.map((q) => q.id));
+      setConfirmingDelete(false);
+      setPage(0);
+      setReloadKey((k) => k + 1);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Não foi possível excluir os orçamentos.');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   // Qualquer mudança de filtro volta para a primeira página.
   function resetting<T>(setter: (value: T) => void) {
@@ -140,6 +165,23 @@ export function QuotesPage() {
             count={quotes.length}
             noun={['orçamento', 'orçamentos']}
           />
+
+          {canDelete && cancelled.length > 0 && (
+            <div className={styles.bulkBar}>
+              <span>Orçamentos cancelados podem ser apagados de vez, com o histórico deles.</span>
+              <button
+                type="button"
+                className={`btn btn-secondary ${styles.bulkDanger}`}
+                onClick={() => {
+                  setDeleteError('');
+                  setConfirmingDelete(true);
+                }}
+              >
+                <Icon name="trash" size={16} />
+                Excluir cancelados ({cancelled.length})
+              </button>
+            </div>
+          )}
 
           {quotes.length === 0 ? (
             <p className={styles.empty}>Nenhum orçamento encontrado no período.</p>
@@ -241,6 +283,26 @@ export function QuotesPage() {
           )}
         </section>
       ) : null}
+
+      <Modal open={confirmingDelete} title="Excluir cancelados" onClose={() => setConfirmingDelete(false)} size="sm">
+        <p className={formStyles.text}>
+          Excluir de vez {cancelled.length === 1 ? 'o orçamento cancelado' : `os ${cancelled.length} orçamentos cancelados`} desta
+          lista, com o histórico? Esta ação não pode ser desfeita.
+        </p>
+        {deleteError && (
+          <p className={formStyles.error} role="alert">
+            {deleteError}
+          </p>
+        )}
+        <div className={formStyles.actions}>
+          <button type="button" className="btn btn-secondary" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+            Voltar
+          </button>
+          <button type="button" className={`btn ${formStyles.dangerBtn}`} onClick={() => void removeCancelled()} disabled={deleting}>
+            {deleting ? 'Excluindo…' : `Excluir ${cancelled.length}`}
+          </button>
+        </div>
+      </Modal>
     </>
   );
 }

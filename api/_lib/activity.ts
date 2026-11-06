@@ -6,7 +6,8 @@ import { invalid } from './http.js';
 /** Guarda uma alteração de configurações ou de usuários (os orçamentos ficam em quote_events). */
 export async function logActivity(
   me: Caller,
-  area: Exclude<ActivityArea, 'Orçamentos'>,
+  /** 'Orçamentos' só para o que não fica na linha do tempo do orçamento (ex.: exclusão). */
+  area: ActivityArea,
   summary: string,
   detail = '',
 ): Promise<void> {
@@ -55,7 +56,7 @@ function readIds(value: unknown): { log: string[]; quote: string[] } {
   if (value.length > ACTIVITY_LIMIT) throw invalid(`Apague no máximo ${ACTIVITY_LIMIT} de cada vez.`);
   const ids = { log: [] as string[], quote: [] as string[] };
   for (const id of value) {
-    const match = typeof id === 'string' ? /^([aq])(d+)$/.exec(id) : null;
+    const match = typeof id === 'string' ? /^([aq])(\d+)$/.exec(id) : null;
     if (!match) throw invalid('Item do histórico inválido.');
     (match[1] === 'a' ? ids.log : ids.quote).push(match[2]!);
   }
