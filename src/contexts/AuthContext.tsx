@@ -62,12 +62,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-/** Nome de quem está conectado e as iniciais do avatar; fora do AuthProvider (testes), "Administrador". */
-export function useUserName(): { name: string; initials: string } {
-  const name = useContext(AuthContext)?.session?.name || 'Administrador';
+/** Nome, e-mail e iniciais de quem está conectado; fora do AuthProvider (testes), "Administrador". */
+export function useUserName(): { name: string; email: string; initials: string } {
+  const session = useContext(AuthContext)?.session;
+  const name = session?.name || 'Administrador';
+  const email = session?.email ?? '';
   const words = name.trim().split(/\s+/);
   const initials = (words.length > 1 ? words[0]![0]! + words[words.length - 1]![0]! : name.slice(0, 2)).toUpperCase();
-  return { name, initials };
+  return { name, email, initials };
+}
+
+/** `logout` do AuthContext; fora do AuthProvider (testes de tela), não faz nada. */
+export function useLogout(): () => Promise<void> {
+  return useContext(AuthContext)?.logout ?? noop;
 }
 
 /** `refresh` do AuthContext; fora do AuthProvider (testes de tela), não faz nada. */
