@@ -10,7 +10,11 @@ afterEach(() => window.localStorage.clear());
 
 describe('UserMenu', () => {
   it('abre com nome e e-mail, fecha no Esc e sai pelo "Sair"', async () => {
-    window.localStorage.setItem(SESSION_KEY, JSON.stringify({ email: 'luis@exemplo.com', name: 'Luis Poletto' }));
+    window.localStorage.setItem(SESSION_KEY, JSON.stringify({
+        email: 'luis@exemplo.com',
+        name: 'Luis Poletto',
+        access: { role: 'Administrador', sellerId: null, sellerName: null, seeAll: true, exceedDiscount: true },
+      }));
     const user = userEvent.setup();
     render(
       <AuthProvider>
