@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { Icon } from '@/components/Icon';
-import { useUserName } from '@/contexts/AuthContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import styles from './Topbar.module.css';
+import { UserMenu } from './UserMenu';
 
 interface TopbarProps {
   mobileMenuOpen: boolean;
@@ -11,7 +11,6 @@ interface TopbarProps {
 
 export function Topbar({ mobileMenuOpen, onOpenMobileMenu }: TopbarProps) {
   const { theme, toggleTheme } = useTheme();
-  const user = useUserName();
   const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -67,11 +66,7 @@ export function Topbar({ mobileMenuOpen, onOpenMobileMenu }: TopbarProps) {
         <span className={styles.dot} />
       </button>
 
-      <button type="button" className={`icon-btn ${styles.userButton}`}>
-        <span className={styles.avatar}>{user.initials}</span>
-        <span className={styles.userName}>{user.name}</span>
-        <Icon name="chevDown" size={16} />
-      </button>
+      <UserMenu />
     </header>
   );
 }
