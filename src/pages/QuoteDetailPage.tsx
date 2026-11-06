@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
-import { useAccess } from '@/contexts/AuthContext';
+import { useAccess, useCan } from '@/contexts/AuthContext';
 import { QuoteStatusBadge } from '@/features/dashboard/QuoteStatusBadge';
 import { Modal } from '@/features/people/Modal';
 import { useQuote } from '@/features/quotes/useQuote';
@@ -9,7 +9,7 @@ import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatDate, formatDateTime, initials } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
-import { updateQuoteStatus } from '@/services/quotesService';
+import { deleteQuote, updateQuoteStatus } from '@/services/quotesService';
 import type { QuoteStatus } from '@/types/dashboard';
 import type { QuoteContact } from '@/types/quotes';
 import type { CompanyInfo } from '@/types/settings';
@@ -100,6 +100,9 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
   const settings = useSettings();
   const access = useAccess();
   const [confirming, setConfirming] = useState<StatusAction | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const canDelete = useCan('deleteRecords');
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
   const printed = useRef(false);
@@ -132,6 +135,19 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
       setActionError(error instanceof Error ? error.message : 'Não foi possível mudar o status.');
       setReloadKey((k) => k + 1);
     } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove() {
+    if (!quote) return;
+    setBusy(true);
+    setDeleteError('');
+    try {
+      await deleteQuote(quote.id);
+      navigate('/orcamentos', { replace: true });
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Não foi possível excluir o orçamento.');
       setBusy(false);
     }
   }
@@ -220,6 +236,21 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
               {action.label}
             </button>
           ))}
+          {/* Cancelado pode ser apagado de vez (gerente e administrador). */}
+          {canDelete && quote.status === 'Cancelado' && (
+            <button
+              type="button"
+              className={`btn btn-secondary ${styles.dangerAction}`}
+              disabled={busy}
+              onClick={() => {
+                setDeleteError('');
+                setConfirmingDelete(true);
+              }}
+            >
+              <Icon name="trash" size={16} />
+              Excluir
+            </button>
+          )}
         </div>
       </div>
 
@@ -375,6 +406,26 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
             disabled={busy}
           >
             {busy ? 'Cancelando…' : 'Cancelar orçamento'}
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={confirmingDelete} title="Excluir orçamento" onClose={() => setConfirmingDelete(false)} size="sm">
+        <p className={formStyles.text}>
+          Excluir de vez o orçamento <strong>{quote.number}</strong>, com todo o histórico dele? Esta ação não pode ser
+          desfeita.
+        </p>
+        {deleteError && (
+          <p className={formStyles.error} role="alert">
+            {deleteError}
+          </p>
+        )}
+        <div className={formStyles.actions}>
+          <button type="button" className="btn btn-secondary" onClick={() => setConfirmingDelete(false)} disabled={busy}>
+            Voltar
+          </button>
+          <button type="button" className={`btn ${formStyles.dangerBtn}`} onClick={() => void remove()} disabled={busy}>
+            {busy ? 'Excluindo…' : 'Excluir orçamento'}
           </button>
         </div>
       </Modal>

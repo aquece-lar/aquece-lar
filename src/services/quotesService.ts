@@ -6,7 +6,7 @@ import { quoteTotals } from '@/lib/quoteTotals';
 import { api, ApiError, USE_MOCKS } from './http';
 import { InvalidPeriodError, inPeriod, validatePeriod } from './period';
 import { fromMock } from './mockLatency';
-import { mockAccess, mockOwnSeller, mockUserName } from './mockSession';
+import { mockAccess, mockEnsure, mockOwnSeller, mockUserName } from './mockSession';
 import { settingsSnapshot } from './settingsService';
 import { buildHistory, buildQuoteDetail } from './mocks/quoteDetailMock';
 import { QUOTES_MOCK } from './mocks/quotesMock';
@@ -173,5 +173,33 @@ export async function updateQuoteStatus(id: string, status: QuoteStatus): Promis
     quotes = quotes.map((q) => (q.id === id ? { ...q, status } : q));
     const events = history.get(id) ?? [];
     history.set(id, [...events, { status, at: new Date().toISOString(), note: STATUS_NOTES[status], by: mockUserName(), detail: '' }]);
+  });
+}
+
+/** Apaga de vez um orçamento cancelado (com o histórico dele). Outro status: recusado. */
+export async function deleteQuote(id: string): Promise<void> {
+  if (!USE_MOCKS) {
+    await viaApi(() => api<void>('DELETE', `/quotes/${id}`), id);
+    return;
+  }
+  return fromMock(() => {
+    mockEnsure('deleteRecords');
+    if (ownQuote(id).status !== 'Cancelado') {
+      throw new ApiError(409, 'quote_not_deletable', 'Só orçamentos cancelados podem ser excluídos.');
+    }
+    quotes = quotes.filter((q) => q.id !== id);
+    history.delete(id);
+  });
+}
+
+/** Apaga de vez os cancelados entre `ids` (os de outro status ficam); devolve quantos saíram. */
+export async function deleteCancelledQuotes(ids: readonly string[]): Promise<number> {
+  if (!USE_MOCKS) return (await api<{ deleted: number }>('DELETE', '/quotes', { ids })).deleted;
+  return fromMock(() => {
+    mockEnsure('deleteRecords');
+    const gone = new Set(quotes.filter((q) => ids.includes(q.id) && q.status === 'Cancelado').map((q) => q.id));
+    quotes = quotes.filter((q) => !gone.has(q.id));
+    for (const id of gone) history.delete(id);
+    return gone.size;
   });
 }

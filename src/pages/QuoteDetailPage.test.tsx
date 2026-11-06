@@ -1,4 +1,5 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 import { getSettings, saveSettings } from '@/services/settingsService';
@@ -37,5 +38,30 @@ describe('PDF do orçamento', () => {
     const footer = screen.getByRole('contentinfo');
     expect(footer).toHaveAttribute('data-print-only');
     expect(footer.textContent).toBe('PIX: 12.345.678/0001-90\nGarantia de 12 meses.');
+  });
+});
+
+describe('excluir orçamento', () => {
+  it('cancelado tem "Excluir", que pede confirmação e volta para a lista', async () => {
+    const router = createMemoryRouter(
+      [
+        { path: '/orcamentos/:id', element: <QuoteDetailPage /> },
+        { path: '/orcamentos', element: <p>lista</p> },
+      ],
+      { initialEntries: ['/orcamentos/1175'] },
+    );
+    const user = userEvent.setup();
+    render(<RouterProvider router={router} />);
+
+    await user.click(await screen.findByRole('button', { name: 'Excluir' }));
+    const dialog = screen.getByRole('dialog', { name: 'Excluir orçamento' });
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir orçamento' }));
+    expect(await screen.findByText('lista')).toBeInTheDocument();
+  });
+
+  it('pendente não tem "Excluir"', async () => {
+    renderQuote('1181');
+    expect(await screen.findByRole('button', { name: 'Marcar como enviado' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument();
   });
 });

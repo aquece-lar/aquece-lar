@@ -2,7 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { toISODate } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
 import type { QuoteDraft } from '@/types/quotes';
-import { createQuote, getQuote, listQuotes, QuoteNotFoundError, updateQuote, updateQuoteStatus } from './quotesService';
+import {
+  createQuote,
+  deleteCancelledQuotes,
+  deleteQuote,
+  getQuote,
+  listQuotes,
+  QuoteNotFoundError,
+  quotesSnapshot,
+  updateQuote,
+  updateQuoteStatus,
+} from './quotesService';
 
 // Os mocks andam com o relógio; os últimos 366 dias cobrem todos eles.
 const now = new Date();
@@ -96,5 +106,25 @@ describe('updateQuote', () => {
 
   it('avisa quando o orçamento não existe', async () => {
     await expect(updateQuote('999999', draft())).rejects.toBeInstanceOf(QuoteNotFoundError);
+  });
+});
+
+describe('excluir orçamentos', () => {
+  it('apaga um cancelado, com o histórico, e recusa os de outro status', async () => {
+    await deleteQuote('1175');
+    await expect(getQuote('1175')).rejects.toBeInstanceOf(QuoteNotFoundError);
+
+    const pending = quotesSnapshot().find((q) => q.status === 'Pendente')!;
+    await expect(deleteQuote(pending.id)).rejects.toThrow('Só orçamentos cancelados podem ser excluídos.');
+    expect(quotesSnapshot().some((q) => q.id === pending.id)).toBe(true);
+  });
+
+  it('em lote, apaga só os cancelados', async () => {
+    const cancelled = quotesSnapshot().filter((q) => q.status === 'Cancelado').slice(0, 2);
+    const approved = quotesSnapshot().find((q) => q.status === 'Aprovado')!;
+    const deleted = await deleteCancelledQuotes([...cancelled.map((q) => q.id), approved.id]);
+    expect(deleted).toBe(2);
+    expect(quotesSnapshot().some((q) => q.id === approved.id)).toBe(true);
+    expect(quotesSnapshot().some((q) => cancelled.some((c) => c.id === q.id))).toBe(false);
   });
 });

@@ -6,6 +6,7 @@ import { can, discountOverLimit, onlyOwn } from '../../src/lib/access.js';
 import { toISODate } from '../../src/lib/format.js';
 import { quoteTotals } from '../../src/lib/quoteTotals.js';
 import { InvalidPeriodError, validatePeriod } from '../../src/services/period.js';
+import { logActivity } from './activity.js';
 import { forbidden, type Caller } from './auth.js';
 import { customerIdByName, customerSellerId } from './customers.js';
 import { db, iso, isUniqueViolation, num, TZ } from './db.js';
@@ -285,6 +286,34 @@ export async function updateQuote(id: string, body: Record<string, unknown>, me:
   // Mudou de status entre a leitura e a gravação.
   if (!row) throw NOT_EDITABLE;
   return toQuote(row);
+}
+
+/**
+ * Apaga de vez orçamentos cancelados (com o histórico deles). Os de outro
+ * status ficam; `{ deleted }` diz quantos saíram. Fica registrado no histórico geral.
+ */
+export async function deleteCancelledQuotes(ids: readonly string[], me: Caller): Promise<{ deleted: number }> {
+  const rows = await db()`
+    delete from quotes where id = any(${ids}::bigint[]) and status = 'Cancelado'
+    returning number, customer_name`;
+  if (rows.length === 1) {
+    const [row] = rows;
+    await logActivity(me, 'Orçamentos', `Orçamento #${row!.number as number} excluído`, `cancelado · ${row!.customer_name as string}`);
+  } else if (rows.length > 1) {
+    const numbers = rows.map((row) => `#${row.number as number}`).sort().join(', ');
+    await logActivity(me, 'Orçamentos', `${rows.length} orçamentos cancelados excluídos`, numbers);
+  }
+  return { deleted: rows.length };
+}
+
+/** Um orçamento: só se estiver cancelado. */
+export async function deleteQuote(id: string, me: Caller): Promise<void> {
+  const status = await currentStatus(id, me.access);
+  if (status !== 'Cancelado') {
+    throw new ApiError(409, 'quote_not_deletable', 'Só orçamentos cancelados podem ser excluídos.');
+  }
+  const { deleted } = await deleteCancelledQuotes([id], me);
+  if (deleted === 0) throw new ApiError(409, 'quote_not_deletable', 'O orçamento mudou enquanto isso. Recarregue a página.');
 }
 
 /** Transições permitidas e o texto do histórico de cada uma. */
