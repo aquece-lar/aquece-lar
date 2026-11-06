@@ -410,6 +410,32 @@
   color: var(--err);
 }
 
+.bulkActions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Coluna das caixas de seleção. */
+.table .selectCell {
+  width: 1%;
+  padding-right: 0;
+}
+
+.selectBox {
+  padding: 0;
+}
+
+.selectBox input {
+  top: 0;
+}
+
+.cardNumber {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 @media (max-width: 640px) {
   .bulkBar {
     margin: 0 16px 12px;
