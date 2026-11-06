@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/contexts/ThemeContext';
 import styles from './Topbar.module.css';
+import { NotificationsMenu } from './NotificationsMenu';
 import { UserMenu } from './UserMenu';
 
 interface TopbarProps {
@@ -61,10 +62,7 @@ export function Topbar({ mobileMenuOpen, onOpenMobileMenu }: TopbarProps) {
         <Icon name={theme === 'claro' ? 'moon' : 'sun'} size={18} />
       </button>
 
-      <button type="button" className={`icon-btn ${styles.bell}`} aria-label="Notificações, 3 novas">
-        <Icon name="bell" size={18} />
-        <span className={styles.dot} />
-      </button>
+      <NotificationsMenu />
 
       <UserMenu />
     </header>
