@@ -26,6 +26,7 @@ describe('UserMenu', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false');
     await user.click(button);
     expect(screen.getByRole('menu')).toHaveTextContent('luis@exemplo.com');
+    expect(screen.getByText('Administrador')).toBeInTheDocument();
     expect(screen.getByRole('menuitem', { name: 'Sair' })).toHaveFocus();
 
     await user.keyboard('{Escape}');
@@ -36,6 +37,25 @@ describe('UserMenu', () => {
     await user.click(screen.getByRole('menuitem', { name: 'Sair' }));
     await waitFor(() => expect(window.localStorage.getItem(SESSION_KEY)).toBeNull());
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('mostra o perfil de vendedor com o cadastro ligado', async () => {
+    window.localStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({
+        email: 'carlos@exemplo.com',
+        name: 'Carlos Menezes',
+        access: { role: 'Vendedor', sellerId: '1', sellerName: 'Carlos Menezes', seeAll: false, exceedDiscount: false },
+      }),
+    );
+    const user = userEvent.setup();
+    render(
+      <AuthProvider>
+        <UserMenu />
+      </AuthProvider>,
+    );
+    await user.click(await screen.findByRole('button', { name: 'Menu de Carlos Menezes' }));
+    expect(screen.getByText('Vendedor · Carlos Menezes')).toBeInTheDocument();
   });
 
   it('fecha ao clicar fora', async () => {
