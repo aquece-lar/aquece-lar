@@ -9,6 +9,7 @@ import { ListToolbar } from '@/features/people/ListToolbar';
 import { Modal } from '@/features/people/Modal';
 import { matches, useList } from '@/features/people/useList';
 import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
+import checkStyles from '@/features/settings/UserForm.module.css';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatBRLRounded, formatDateTime, toISODate } from '@/lib/format';
 import { deleteCancelledQuotes, listQuotes } from '@/services/quotesService';
@@ -27,6 +28,24 @@ function defaultPeriod(): Period {
     from: toISODate(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
     to: toISODate(now),
   };
+}
+
+/** Caixa de seleção no visual do sistema; o texto vai só para o leitor de tela. */
+function SelectBox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return (
+    <label className={`${checkStyles.check} ${styles.selectBox}`}>
+      <input
+        type="checkbox"
+        className={checkStyles.checkInput}
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        aria-label={label}
+      />
+      <span className={checkStyles.checkBox} aria-hidden="true">
+        <Icon name="check" size={14} />
+      </span>
+    </label>
+  );
 }
 
 function QuoteActions({ quote }: { quote: Quote }) {
@@ -53,7 +72,9 @@ export function QuotesPage() {
   const [page, setPage] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
   const canDelete = useCan('deleteRecords');
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  /** Qual exclusão está sendo confirmada: só os marcados ou todos os cancelados da lista. */
+  const [confirmingDelete, setConfirmingDelete] = useState<'selected' | 'all' | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
@@ -89,15 +110,31 @@ export function QuotesPage() {
   const visible = quotes.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
   const total = quotes.reduce((sum, q) => sum + q.amount, 0);
 
-  // Com o filtro "Cancelado", dá para apagar de vez os que estão na lista (período e busca atuais).
+  // Com o filtro "Cancelado", dá para apagar de vez os marcados ou todos da lista (período e busca atuais).
   const cancelled = filter === 'Cancelado' ? quotes : [];
+  const selecting = canDelete && cancelled.length > 0;
+  const picked = cancelled.filter((q) => selected.has(q.id)).map((q) => q.id);
+  const toDelete = confirmingDelete === 'all' ? cancelled.map((q) => q.id) : picked;
+  const pageAllPicked = visible.length > 0 && visible.every((q) => selected.has(q.id));
+
+  function pick(ids: readonly string[], on: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+  }
 
   async function removeCancelled() {
     setDeleting(true);
     setDeleteError('');
     try {
-      await deleteCancelledQuotes(cancelled.map((q) => q.id));
-      setConfirmingDelete(false);
+      await deleteCancelledQuotes(toDelete);
+      setConfirmingDelete(null);
+      setSelected(new Set());
       setPage(0);
       setReloadKey((k) => k + 1);
     } catch (error) {
@@ -112,6 +149,7 @@ export function QuotesPage() {
     return (value: T) => {
       setter(value);
       setPage(0);
+      setSelected(new Set());
     };
   }
 
@@ -166,20 +204,37 @@ export function QuotesPage() {
             noun={['orçamento', 'orçamentos']}
           />
 
-          {canDelete && cancelled.length > 0 && (
+          {selecting && (
             <div className={styles.bulkBar}>
-              <span>Orçamentos cancelados podem ser apagados de vez, com o histórico deles.</span>
-              <button
-                type="button"
-                className={`btn btn-secondary ${styles.bulkDanger}`}
-                onClick={() => {
-                  setDeleteError('');
-                  setConfirmingDelete(true);
-                }}
-              >
-                <Icon name="trash" size={16} />
-                Excluir cancelados ({cancelled.length})
-              </button>
+              <span>
+                {picked.length > 0
+                  ? `${picked.length} ${picked.length === 1 ? 'selecionado' : 'selecionados'}`
+                  : 'Marque os que quer apagar de vez, ou apague todos.'}
+              </span>
+              <span className={styles.bulkActions}>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${styles.bulkDanger}`}
+                  disabled={picked.length === 0}
+                  onClick={() => {
+                    setDeleteError('');
+                    setConfirmingDelete('selected');
+                  }}
+                >
+                  <Icon name="trash" size={16} />
+                  Excluir selecionados ({picked.length})
+                </button>
+                <button
+                  type="button"
+                  className={`btn btn-secondary ${styles.bulkDanger}`}
+                  onClick={() => {
+                    setDeleteError('');
+                    setConfirmingDelete('all');
+                  }}
+                >
+                  Excluir todos ({cancelled.length})
+                </button>
+              </span>
             </div>
           )}
 
@@ -191,6 +246,15 @@ export function QuotesPage() {
                 <table className={styles.table}>
                   <thead>
                     <tr>
+                      {selecting && (
+                        <th scope="col" className={styles.selectCell}>
+                          <SelectBox
+                            label="Selecionar todos desta página"
+                            checked={pageAllPicked}
+                            onChange={(on) => pick(visible.map((q) => q.id), on)}
+                          />
+                        </th>
+                      )}
                       <th scope="col">Nº</th>
                       <th scope="col">Cliente</th>
                       <th scope="col">Vendedor</th>
@@ -207,6 +271,15 @@ export function QuotesPage() {
                   <tbody>
                     {visible.map((quote) => (
                       <tr key={quote.id} className={styles.row}>
+                        {selecting && (
+                          <td className={styles.selectCell}>
+                            <SelectBox
+                              label={`Selecionar ${quote.number}`}
+                              checked={selected.has(quote.id)}
+                              onChange={(on) => pick([quote.id], on)}
+                            />
+                          </td>
+                        )}
                         <td className={styles.name}>{quote.number}</td>
                         <td>{quote.customer}</td>
                         <td className={styles.muted}>{quote.seller}</td>
@@ -231,7 +304,16 @@ export function QuotesPage() {
                 {visible.map((quote) => (
                   <li key={quote.id} className={styles.itemCard}>
                     <div className={styles.cardTop}>
-                      <span className={styles.name}>{quote.number}</span>
+                      <span className={styles.cardNumber}>
+                        {selecting && (
+                          <SelectBox
+                            label={`Selecionar ${quote.number}`}
+                            checked={selected.has(quote.id)}
+                            onChange={(on) => pick([quote.id], on)}
+                          />
+                        )}
+                        <span className={styles.name}>{quote.number}</span>
+                      </span>
                       <span className={styles.badges}>
                         <QuoteStatusBadge status={quote.status} />
                         <ExpiryBadge quote={quote} alertDays={alertDays} compact />
@@ -284,10 +366,15 @@ export function QuotesPage() {
         </section>
       ) : null}
 
-      <Modal open={confirmingDelete} title="Excluir cancelados" onClose={() => setConfirmingDelete(false)} size="sm">
+      <Modal
+        open={confirmingDelete !== null}
+        title={confirmingDelete === 'all' ? 'Excluir todos os cancelados' : 'Excluir selecionados'}
+        onClose={() => setConfirmingDelete(null)}
+        size="sm"
+      >
         <p className={formStyles.text}>
-          Excluir de vez {cancelled.length === 1 ? 'o orçamento cancelado' : `os ${cancelled.length} orçamentos cancelados`} desta
-          lista, com o histórico? Esta ação não pode ser desfeita.
+          Excluir de vez {toDelete.length === 1 ? 'o orçamento cancelado' : `os ${toDelete.length} orçamentos cancelados`}
+          {confirmingDelete === 'all' ? ' desta lista' : ' selecionados'}, com o histórico? Esta ação não pode ser desfeita.
         </p>
         {deleteError && (
           <p className={formStyles.error} role="alert">
@@ -295,11 +382,11 @@ export function QuotesPage() {
           </p>
         )}
         <div className={formStyles.actions}>
-          <button type="button" className="btn btn-secondary" onClick={() => setConfirmingDelete(false)} disabled={deleting}>
+          <button type="button" className="btn btn-secondary" onClick={() => setConfirmingDelete(null)} disabled={deleting}>
             Voltar
           </button>
           <button type="button" className={`btn ${formStyles.dangerBtn}`} onClick={() => void removeCancelled()} disabled={deleting}>
-            {deleting ? 'Excluindo…' : `Excluir ${cancelled.length}`}
+            {deleting ? 'Excluindo…' : `Excluir ${toDelete.length}`}
           </button>
         </div>
       </Modal>
