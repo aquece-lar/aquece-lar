@@ -41,8 +41,13 @@ describe('exportar', () => {
   });
 });
 
+/** As ações em lote aparecem no lugar dos títulos da tabela, só com algo marcado. */
+function head() {
+  return within(screen.getByRole('table')).getAllByRole('rowgroup')[0]!;
+}
+
 describe('cancelar em lote na lista', () => {
-  it('cancela os marcados, que continuam na lista como cancelados', async () => {
+  it('sem nada marcado não há ações; cancela os marcados, que continuam como cancelados', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -54,18 +59,19 @@ describe('cancelar em lote na lista', () => {
     const pending = tabCount('Pendente');
     const cancelled = cancelledCount();
     expect(pending).toBeGreaterThan(1);
-    expect(screen.getByRole('button', { name: 'Cancelar (0)' })).toBeDisabled();
+    expect(within(head()).queryByRole('button', { name: 'Cancelar' })).not.toBeInTheDocument();
 
-    const table = screen.getByRole('table');
-    const boxes = within(table).getAllByRole('checkbox', { name: /^Selecionar #/ });
+    const boxes = within(screen.getByRole('table')).getAllByRole('checkbox', { name: /^Selecionar #/ });
     await user.click(boxes[0]!);
     await user.click(boxes[1]!);
-    await user.click(screen.getByRole('button', { name: 'Cancelar (2)' }));
+    expect(within(head()).getByText('2 selecionados')).toBeInTheDocument();
+    await user.click(within(head()).getByRole('button', { name: 'Cancelar' }));
     const dialog = screen.getByRole('dialog', { name: 'Cancelar orçamentos' });
     await user.click(within(dialog).getByRole('button', { name: 'Cancelar 2' }));
 
     await waitFor(() => expect(tabCount('Pendente')).toBe(pending - 2));
     expect(cancelledCount()).toBe(cancelled + 2);
+    expect(within(head()).getByText('Nº')).toBeInTheDocument();
   });
 
   it('cancelar e apagar tira os marcados da lista', async () => {
@@ -82,7 +88,7 @@ describe('cancelar em lote na lista', () => {
 
     const [first] = within(screen.getByRole('table')).getAllByRole('checkbox', { name: /^Selecionar #/ });
     await user.click(first!);
-    await user.click(screen.getByRole('button', { name: 'Cancelar e apagar (1)' }));
+    await user.click(within(head()).getByRole('button', { name: 'Cancelar e apagar' }));
     const dialog = screen.getByRole('dialog', { name: 'Cancelar e apagar' });
     await user.click(within(dialog).getByRole('button', { name: 'Apagar 1' }));
 
@@ -100,37 +106,30 @@ describe('cancelar em lote na lista', () => {
     await screen.findByRole('region', { name: 'Lista de orçamentos' });
     await user.click(screen.getByRole('button', { name: /^Aprovado · \d+$/ }));
     expect(within(screen.getByRole('table')).queryByRole('checkbox')).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Cancelar \(/ })).not.toBeInTheDocument();
   });
 });
 
-describe('excluir cancelados na lista', () => {
-  it('com o filtro Cancelado, exclui só os marcados', async () => {
+describe('cancelados na lista', () => {
+  it('exclui só os marcados', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
         <QuotesPage />
       </MemoryRouter>,
     );
-    const list = await screen.findByRole('region', { name: 'Lista de orçamentos' });
-
+    await screen.findByRole('region', { name: 'Lista de orçamentos' });
     await user.click(screen.getByRole('button', { name: /^Cancelado · \d+$/ }));
     const before = cancelledCount();
     expect(before).toBeGreaterThan(1);
-    expect(screen.getByRole('button', { name: 'Excluir selecionados (0)' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: `Excluir todos (${before})` })).toBeEnabled();
 
-    const table = within(list).getByRole('table');
-    const [first] = within(table).getAllByRole('checkbox', { name: /^Selecionar #/ });
+    const [first] = within(screen.getByRole('table')).getAllByRole('checkbox', { name: /^Selecionar #/ });
     await user.click(first!);
-    expect(screen.getByText('1 selecionado')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Excluir selecionados (1)' }));
-    const dialog = screen.getByRole('dialog', { name: 'Excluir selecionados' });
+    expect(within(head()).getByText('1 selecionado')).toBeInTheDocument();
+    await user.click(within(head()).getByRole('button', { name: 'Excluir' }));
+    const dialog = screen.getByRole('dialog', { name: 'Excluir cancelados' });
     await user.click(within(dialog).getByRole('button', { name: 'Excluir 1' }));
 
     await waitFor(() => expect(cancelledCount()).toBe(before - 1));
-    expect(screen.getByRole('button', { name: 'Excluir selecionados (0)' })).toBeDisabled();
   });
 
   it('reabre os marcados como pendentes', async () => {
@@ -144,11 +143,10 @@ describe('excluir cancelados na lista', () => {
     await user.click(screen.getByRole('button', { name: /^Cancelado · \d+$/ }));
     const cancelled = cancelledCount();
     const pending = tabCount('Pendente');
-    expect(screen.getByRole('button', { name: 'Reabrir (0)' })).toBeDisabled();
 
     const [first] = within(screen.getByRole('table')).getAllByRole('checkbox', { name: /^Selecionar #/ });
     await user.click(first!);
-    await user.click(screen.getByRole('button', { name: 'Reabrir (1)' }));
+    await user.click(within(head()).getByRole('button', { name: 'Reabrir' }));
     const dialog = screen.getByRole('dialog', { name: 'Reabrir orçamentos' });
     await user.click(within(dialog).getByRole('button', { name: 'Reabrir 1' }));
 
@@ -156,7 +154,28 @@ describe('excluir cancelados na lista', () => {
     expect(tabCount('Pendente')).toBe(pending + 1);
   });
 
-  it('a caixa do cabeçalho marca a página inteira', async () => {
+  it('a caixa do cabeçalho marca a página inteira, e "Limpar seleção" desmarca', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuotesPage />
+      </MemoryRouter>,
+    );
+    await screen.findByRole('region', { name: 'Lista de orçamentos' });
+    await user.click(screen.getByRole('button', { name: /^Pendente · \d+$/ }));
+    const rows = within(screen.getByRole('table')).getAllByRole('checkbox', { name: /^Selecionar #/ }).length;
+
+    await user.click(within(head()).getByRole('checkbox', { name: 'Selecionar todos desta página' }));
+    expect(within(head()).getByText(`${rows} selecionados`)).toBeInTheDocument();
+    // Se a página não tem todos, "Selecionar todos" completa; aí aparece "Limpar seleção".
+    const all = within(head()).queryByRole('button', { name: /^Selecionar todos os \d+$/ });
+    if (all) await user.click(all);
+    await user.click(within(head()).getByRole('button', { name: 'Limpar seleção' }));
+    expect(within(head()).queryByText(/selecionados$/)).not.toBeInTheDocument();
+    expect(within(head()).getByText('Nº')).toBeInTheDocument();
+  });
+
+  it('"Selecionar todos" pega a lista inteira, de todas as páginas, e exclui tudo', async () => {
     const user = userEvent.setup();
     render(
       <MemoryRouter>
@@ -165,10 +184,16 @@ describe('excluir cancelados na lista', () => {
     );
     await screen.findByRole('region', { name: 'Lista de orçamentos' });
     await user.click(screen.getByRole('button', { name: /^Cancelado · \d+$/ }));
-    const table = screen.getByRole('table');
-    const rows = within(table).getAllByRole('checkbox', { name: /^Selecionar #/ }).length;
+    const before = cancelledCount();
 
-    await user.click(within(table).getByRole('checkbox', { name: 'Selecionar todos desta página' }));
-    expect(screen.getByRole('button', { name: `Excluir selecionados (${rows})` })).toBeEnabled();
+    const [first] = within(screen.getByRole('table')).getAllByRole('checkbox', { name: /^Selecionar #/ });
+    await user.click(first!);
+    await user.click(within(head()).getByRole('button', { name: `Selecionar todos os ${before}` }));
+    expect(within(head()).getByText(`${before} selecionados`)).toBeInTheDocument();
+    await user.click(within(head()).getByRole('button', { name: 'Excluir' }));
+    const dialog = screen.getByRole('dialog', { name: 'Excluir cancelados' });
+    await user.click(within(dialog).getByRole('button', { name: `Excluir ${before}` }));
+
+    await waitFor(() => expect(cancelledCount()).toBe(0));
   });
 });

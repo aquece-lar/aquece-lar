@@ -429,29 +429,76 @@
   min-width: 8em;
 }
 
-/* Faixa acima da tabela para ações em lote (ex.: excluir cancelados). */
-.bulkBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: 0 24px 12px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: var(--subtle);
-  font-size: 13px;
-  color: var(--text-2);
+/* Ações em lote: aparecem só com algo marcado, no lugar dos títulos da tabela. */
+.table .selectionHead {
+  font-weight: 400;
 }
 
-.bulkDanger {
+/* Tudo junto à esquerda: com a tabela rolando para o lado, nada fica escondido. */
+.selectionRow,
+.selectionBar {
+  display: flex;
+  align-items: center;
+  gap: 8px 16px;
+  flex-wrap: wrap;
+}
+
+.selectionActions {
+  padding-left: 16px;
+  border-left: 1px solid var(--line-strong);
+}
+
+.selectionInfo,
+.selectionActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px 14px;
+  flex-wrap: wrap;
+}
+
+.selectionCount {
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Botão com cara de link: discreto, sem caixa. */
+.linkBtn {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.linkBtn:hover {
+  color: var(--text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.linkBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.linkDanger,
+.linkDanger:hover {
   color: var(--err);
 }
 
-.bulkActions {
-  display: inline-flex;
-  gap: 8px;
-  flex-wrap: wrap;
+/* No celular não há cabeçalho de tabela: a mesma linha fica acima dos cartões. */
+.selectionBar {
+  display: none;
+}
+
+.notice {
+  margin: 0 24px 12px;
+  font-size: 13px;
+  color: var(--text-2);
 }
 
 /* Coluna das caixas de seleção. */
@@ -474,8 +521,17 @@
   gap: 10px;
 }
 
-@media (max-width: 640px) {
-  .bulkBar {
+@media (max-width: 720px) {
+  .selectionBar {
+    display: flex;
+    margin: 0 16px 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--subtle);
+    font-size: 13px;
+  }
+
+  .notice {
     margin: 0 16px 12px;
   }
 }

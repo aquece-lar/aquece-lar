@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider, useParams } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
@@ -110,7 +110,8 @@ describe('novo orçamento', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
 
     await screen.findByText('PT'); // iniciais no cartão do cliente
-    expect(field).toHaveValue('Padaria Teste');
+    // O campo recebe o nome numa renderização logo depois do cartão.
+    await waitFor(() => expect(field).toHaveValue('Padaria Teste'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

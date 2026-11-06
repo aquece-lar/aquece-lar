@@ -26,11 +26,10 @@ const PAGE_SIZE = 15;
 const CANCELLABLE: QuoteStatus[] = ['Pendente', 'Enviado'];
 
 /** Ação em lote sendo confirmada. */
-type BulkAction = 'delete-selected' | 'delete-all' | 'cancel' | 'cancel-delete' | 'reopen';
+type BulkAction = 'delete' | 'cancel' | 'cancel-delete' | 'reopen';
 
 const MODAL_TITLES: Record<BulkAction, string> = {
-  'delete-selected': 'Excluir selecionados',
-  'delete-all': 'Excluir todos os cancelados',
+  delete: 'Excluir cancelados',
   cancel: 'Cancelar orçamentos',
   'cancel-delete': 'Cancelar e apagar',
   reopen: 'Reabrir orçamentos',
@@ -140,14 +139,14 @@ export function QuotesPage() {
   const visible = quotes.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
   const total = quotes.reduce((sum, q) => sum + q.amount, 0);
 
-  // Com o filtro "Cancelado", dá para reabrir os marcados, ou apagar de vez os marcados ou todos da lista (período e busca atuais).
+  // Com o filtro "Cancelado", dá para reabrir ou apagar de vez os marcados ("Selecionar todos" pega a lista inteira, com período e busca atuais).
   // Nos outros filtros, marcam-se pendentes e enviados para cancelar, ou cancelar e já apagar.
   const deleteMode = filter === 'Cancelado';
   const selectable = (q: Quote) => deleteMode || CANCELLABLE.includes(q.status);
   const candidates = quotes.filter(selectable);
   const selecting = candidates.length > 0;
   const picked = candidates.filter((q) => selected.has(q.id)).map((q) => q.id);
-  const targets = confirming === 'delete-all' ? candidates.map((q) => q.id) : picked;
+  const targets = picked;
   const pageCandidates = visible.filter(selectable);
   const pageAllPicked = pageCandidates.length > 0 && pageCandidates.every((q) => selected.has(q.id));
 
@@ -175,7 +174,7 @@ export function QuotesPage() {
       const done =
         confirming === 'reopen'
           ? await reopenQuotes(targets)
-          : confirming.startsWith('delete')
+          : confirming === 'delete'
             ? await deleteCancelledQuotes(targets)
             : await cancelQuotes(targets, { remove: confirming === 'cancel-delete' });
       const skipped = targets.length - done;
@@ -194,6 +193,55 @@ export function QuotesPage() {
       setWorking(false);
     }
   }
+
+  // Ações em lote, só com algo marcado: no lugar dos títulos da tabela (ou acima dos cartões, no celular).
+  const selectionActions = (
+    <>
+      <span className={styles.selectionInfo}>
+        <span className={styles.selectionCount}>
+          {picked.length} {picked.length === 1 ? 'selecionado' : 'selecionados'}
+        </span>
+        {picked.length < candidates.length ? (
+          <button type="button" className={styles.linkBtn} onClick={() => pick(candidates.map((q) => q.id), true)}>
+            Selecionar todos os {candidates.length}
+          </button>
+        ) : (
+          <button type="button" className={styles.linkBtn} onClick={() => setSelected(new Set())}>
+            Limpar seleção
+          </button>
+        )}
+      </span>
+      <span className={styles.selectionActions}>
+        {deleteMode ? (
+          <>
+            <button type="button" className={styles.linkBtn} onClick={() => ask('reopen')}>
+              Reabrir
+            </button>
+            {canDelete && (
+              <button type="button" className={`${styles.linkBtn} ${styles.linkDanger}`} onClick={() => ask('delete')}>
+                Excluir
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button type="button" className={styles.linkBtn} onClick={() => ask('cancel')}>
+              Cancelar
+            </button>
+            {canDelete && (
+              <button
+                type="button"
+                className={`${styles.linkBtn} ${styles.linkDanger}`}
+                onClick={() => ask('cancel-delete')}
+              >
+                Cancelar e apagar
+              </button>
+            )}
+          </>
+        )}
+      </span>
+    </>
+  );
 
   // Qualquer mudança de filtro volta para a primeira página.
   function resetting<T>(setter: (value: T) => void) {
@@ -266,76 +314,13 @@ export function QuotesPage() {
             noun={['orçamento', 'orçamentos']}
           />
 
-          {selecting && (
-            <div className={styles.bulkBar}>
-              <span>
-                {picked.length > 0
-                  ? `${picked.length} ${picked.length === 1 ? 'selecionado' : 'selecionados'}`
-                  : notice ||
-                    (deleteMode
-                      ? canDelete
-                        ? 'Marque os que quer reabrir ou apagar.'
-                        : 'Marque os que quer reabrir.'
-                      : 'Marque pendentes ou enviados para cancelar.')}
-              </span>
-              <span className={styles.bulkActions}>
-                {deleteMode ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={picked.length === 0}
-                      onClick={() => ask('reopen')}
-                    >
-                      Reabrir ({picked.length})
-                    </button>
-                    {canDelete && (
-                      <>
-                        <button
-                          type="button"
-                          className={`btn btn-secondary ${styles.bulkDanger}`}
-                          disabled={picked.length === 0}
-                          onClick={() => ask('delete-selected')}
-                        >
-                          <Icon name="trash" size={16} />
-                          Excluir selecionados ({picked.length})
-                        </button>
-                        <button
-                          type="button"
-                          className={`btn btn-secondary ${styles.bulkDanger}`}
-                          onClick={() => ask('delete-all')}
-                        >
-                          Excluir todos ({candidates.length})
-                        </button>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="btn btn-secondary"
-                      disabled={picked.length === 0}
-                      onClick={() => ask('cancel')}
-                    >
-                      Cancelar ({picked.length})
-                    </button>
-                    {canDelete && (
-                      <button
-                        type="button"
-                        className={`btn btn-secondary ${styles.bulkDanger}`}
-                        disabled={picked.length === 0}
-                        onClick={() => ask('cancel-delete')}
-                      >
-                        <Icon name="trash" size={16} />
-                        Cancelar e apagar ({picked.length})
-                      </button>
-                    )}
-                  </>
-                )}
-              </span>
-            </div>
+          {notice && picked.length === 0 && (
+            <p className={styles.notice} role="status">
+              {notice}
+            </p>
           )}
+
+          {picked.length > 0 && <div className={styles.selectionBar}>{selectionActions}</div>}
 
           {quotes.length === 0 ? (
             <p className={styles.empty}>Nenhum orçamento encontrado no período.</p>
@@ -354,17 +339,25 @@ export function QuotesPage() {
                           />
                         </th>
                       )}
-                      <th scope="col">Nº</th>
-                      <th scope="col">Cliente</th>
-                      <th scope="col">Vendedor</th>
-                      <th scope="col" className={styles.num}>
-                        Valor
-                      </th>
-                      <th scope="col">Status</th>
-                      <th scope="col">Data</th>
-                      <th scope="col" className={styles.actionsHead}>
-                        <span className="sr-only">Ações</span>
-                      </th>
+                      {picked.length > 0 ? (
+                        <th scope="col" colSpan={7} className={styles.selectionHead}>
+                          <span className={styles.selectionRow}>{selectionActions}</span>
+                        </th>
+                      ) : (
+                        <>
+                          <th scope="col">Nº</th>
+                          <th scope="col">Cliente</th>
+                          <th scope="col">Vendedor</th>
+                          <th scope="col" className={styles.num}>
+                            Valor
+                          </th>
+                          <th scope="col">Status</th>
+                          <th scope="col">Data</th>
+                          <th scope="col" className={styles.actionsHead}>
+                            <span className="sr-only">Ações</span>
+                          </th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -480,7 +473,7 @@ export function QuotesPage() {
             ? `Cancelar ${plural(targets.length, 'o orçamento selecionado? Ele continua na lista, como cancelado.', 'os # orçamentos selecionados? Eles continuam na lista, como cancelados.')}`
             : confirming === 'cancel-delete'
               ? `Cancelar e apagar de vez ${plural(targets.length, 'o orçamento selecionado', 'os # orçamentos selecionados')}, com o histórico? Esta ação não pode ser desfeita.`
-              : `Excluir de vez ${plural(targets.length, 'o orçamento cancelado', 'os # orçamentos cancelados')}${confirming === 'delete-all' ? ' desta lista' : ' selecionados'}, com o histórico? Esta ação não pode ser desfeita.`}
+              : `Excluir de vez ${plural(targets.length, 'o orçamento cancelado selecionado', 'os # orçamentos cancelados selecionados')}, com o histórico? Esta ação não pode ser desfeita.`}
         </p>
         {bulkError && (
           <p className={formStyles.error} role="alert">
