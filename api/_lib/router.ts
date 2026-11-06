@@ -11,6 +11,7 @@ import { ensureSchema } from './migrate.js';
 import { createProduct, deleteProduct, listProducts, updateProduct } from './products.js';
 import {
   cancelQuotes,
+  reopenQuotes,
   changeStatus,
   createQuote,
   deleteCancelledQuotes,
@@ -115,6 +116,12 @@ export async function handle(request: Request, path: string): Promise<Response> 
       if (method !== 'POST') throw METHOD_NOT_ALLOWED;
       const body = await readBody(request);
       return json(await cancelQuotes(readQuoteIds(body), body.delete === true, me));
+    }
+
+    // Reabrir em lote: `{ ids }`; os cancelados voltam para pendente.
+    if (resource === 'quotes' && id === 'reopen' && !action && rest.length === 0) {
+      if (method !== 'POST') throw METHOD_NOT_ALLOWED;
+      return json(await reopenQuotes(readQuoteIds(await readBody(request)), me));
     }
 
     // Ids são numéricos; qualquer outra coisa não existe.

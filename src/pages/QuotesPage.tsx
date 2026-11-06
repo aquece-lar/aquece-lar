@@ -12,7 +12,7 @@ import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
 import checkStyles from '@/features/settings/UserForm.module.css';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatBRLRounded, formatDateTime, toISODate } from '@/lib/format';
-import { cancelQuotes, deleteCancelledQuotes, listQuotes } from '@/services/quotesService';
+import { cancelQuotes, deleteCancelledQuotes, listQuotes, reopenQuotes } from '@/services/quotesService';
 import type { Period, QuoteStatus } from '@/types/dashboard';
 import type { Quote } from '@/types/quotes';
 import styles from './ListPage.module.css';
@@ -25,13 +25,14 @@ const PAGE_SIZE = 15;
 const CANCELLABLE: QuoteStatus[] = ['Pendente', 'Enviado'];
 
 /** Ação em lote sendo confirmada. */
-type BulkAction = 'delete-selected' | 'delete-all' | 'cancel' | 'cancel-delete';
+type BulkAction = 'delete-selected' | 'delete-all' | 'cancel' | 'cancel-delete' | 'reopen';
 
 const MODAL_TITLES: Record<BulkAction, string> = {
   'delete-selected': 'Excluir selecionados',
   'delete-all': 'Excluir todos os cancelados',
   cancel: 'Cancelar orçamentos',
   'cancel-delete': 'Cancelar e apagar',
+  reopen: 'Reabrir orçamentos',
 };
 
 /** `many` com # no lugar do número. */
@@ -128,10 +129,10 @@ export function QuotesPage() {
   const visible = quotes.slice(current * PAGE_SIZE, (current + 1) * PAGE_SIZE);
   const total = quotes.reduce((sum, q) => sum + q.amount, 0);
 
-  // Com o filtro "Cancelado", dá para apagar de vez os marcados ou todos da lista (período e busca atuais).
+  // Com o filtro "Cancelado", dá para reabrir os marcados, ou apagar de vez os marcados ou todos da lista (período e busca atuais).
   // Nos outros filtros, marcam-se pendentes e enviados para cancelar, ou cancelar e já apagar.
   const deleteMode = filter === 'Cancelado';
-  const selectable = (q: Quote) => (deleteMode ? canDelete : CANCELLABLE.includes(q.status));
+  const selectable = (q: Quote) => deleteMode || CANCELLABLE.includes(q.status);
   const candidates = quotes.filter(selectable);
   const selecting = candidates.length > 0;
   const picked = candidates.filter((q) => selected.has(q.id)).map((q) => q.id);
@@ -160,9 +161,12 @@ export function QuotesPage() {
     setWorking(true);
     setBulkError('');
     try {
-      const done = confirming.startsWith('delete')
-        ? await deleteCancelledQuotes(targets)
-        : await cancelQuotes(targets, { remove: confirming === 'cancel-delete' });
+      const done =
+        confirming === 'reopen'
+          ? await reopenQuotes(targets)
+          : confirming.startsWith('delete')
+            ? await deleteCancelledQuotes(targets)
+            : await cancelQuotes(targets, { remove: confirming === 'cancel-delete' });
       const skipped = targets.length - done;
       setNotice(
         skipped > 0
@@ -242,13 +246,15 @@ export function QuotesPage() {
           />
 
           {selecting && (
-            <div className={`${styles.bulkBar} ${deleteMode ? '' : styles.bulkNeutral}`}>
+            <div className={styles.bulkBar}>
               <span>
                 {picked.length > 0
                   ? `${picked.length} ${picked.length === 1 ? 'selecionado' : 'selecionados'}`
                   : notice ||
                     (deleteMode
-                      ? 'Marque os que quer apagar de vez, ou apague todos.'
+                      ? canDelete
+                        ? 'Marque os que quer reabrir ou apagar.'
+                        : 'Marque os que quer reabrir.'
                       : 'Marque pendentes ou enviados para cancelar.')}
               </span>
               <span className={styles.bulkActions}>
@@ -256,20 +262,32 @@ export function QuotesPage() {
                   <>
                     <button
                       type="button"
-                      className={`btn btn-secondary ${styles.bulkDanger}`}
+                      className="btn btn-secondary"
                       disabled={picked.length === 0}
-                      onClick={() => ask('delete-selected')}
+                      onClick={() => ask('reopen')}
                     >
-                      <Icon name="trash" size={16} />
-                      Excluir selecionados ({picked.length})
+                      Reabrir ({picked.length})
                     </button>
-                    <button
-                      type="button"
-                      className={`btn btn-secondary ${styles.bulkDanger}`}
-                      onClick={() => ask('delete-all')}
-                    >
-                      Excluir todos ({candidates.length})
-                    </button>
+                    {canDelete && (
+                      <>
+                        <button
+                          type="button"
+                          className={`btn btn-secondary ${styles.bulkDanger}`}
+                          disabled={picked.length === 0}
+                          onClick={() => ask('delete-selected')}
+                        >
+                          <Icon name="trash" size={16} />
+                          Excluir selecionados ({picked.length})
+                        </button>
+                        <button
+                          type="button"
+                          className={`btn btn-secondary ${styles.bulkDanger}`}
+                          onClick={() => ask('delete-all')}
+                        >
+                          Excluir todos ({candidates.length})
+                        </button>
+                      </>
+                    )}
                   </>
                 ) : (
                   <>
@@ -435,7 +453,9 @@ export function QuotesPage() {
         size="sm"
       >
         <p className={formStyles.text}>
-          {confirming === 'cancel'
+          {confirming === 'reopen'
+            ? `Reabrir ${plural(targets.length, 'o orçamento selecionado? Ele volta para pendente.', 'os # orçamentos selecionados? Eles voltam para pendente.')}`
+            : confirming === 'cancel'
             ? `Cancelar ${plural(targets.length, 'o orçamento selecionado? Ele continua na lista, como cancelado.', 'os # orçamentos selecionados? Eles continuam na lista, como cancelados.')}`
             : confirming === 'cancel-delete'
               ? `Cancelar e apagar de vez ${plural(targets.length, 'o orçamento selecionado', 'os # orçamentos selecionados')}, com o histórico? Esta ação não pode ser desfeita.`
@@ -450,9 +470,13 @@ export function QuotesPage() {
           <button type="button" className="btn btn-secondary" onClick={() => setConfirming(null)} disabled={working}>
             Voltar
           </button>
-          {confirming === 'cancel' ? (
+          {confirming === 'cancel' || confirming === 'reopen' ? (
             <button type="button" className="btn btn-primary" onClick={() => void runBulk()} disabled={working}>
-              {working ? 'Cancelando…' : `Cancelar ${targets.length}`}
+              {working
+                ? confirming === 'reopen'
+                  ? 'Reabrindo…'
+                  : 'Cancelando…'
+                : `${confirming === 'reopen' ? 'Reabrir' : 'Cancelar'} ${targets.length}`}
             </button>
           ) : (
             <button type="button" className={`btn ${formStyles.dangerBtn}`} onClick={() => void runBulk()} disabled={working}>

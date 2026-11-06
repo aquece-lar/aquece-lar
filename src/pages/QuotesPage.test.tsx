@@ -103,6 +103,29 @@ describe('excluir cancelados na lista', () => {
     expect(screen.getByRole('button', { name: 'Excluir selecionados (0)' })).toBeDisabled();
   });
 
+  it('reabre os marcados como pendentes', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <QuotesPage />
+      </MemoryRouter>,
+    );
+    await screen.findByRole('region', { name: 'Lista de orçamentos' });
+    await user.click(screen.getByRole('button', { name: /^Cancelado · \d+$/ }));
+    const cancelled = cancelledCount();
+    const pending = tabCount('Pendente');
+    expect(screen.getByRole('button', { name: 'Reabrir (0)' })).toBeDisabled();
+
+    const [first] = within(screen.getByRole('table')).getAllByRole('checkbox', { name: /^Selecionar #/ });
+    await user.click(first!);
+    await user.click(screen.getByRole('button', { name: 'Reabrir (1)' }));
+    const dialog = screen.getByRole('dialog', { name: 'Reabrir orçamentos' });
+    await user.click(within(dialog).getByRole('button', { name: 'Reabrir 1' }));
+
+    await waitFor(() => expect(cancelledCount()).toBe(cancelled - 1));
+    expect(tabCount('Pendente')).toBe(pending + 1);
+  });
+
   it('a caixa do cabeçalho marca a página inteira', async () => {
     const user = userEvent.setup();
     render(

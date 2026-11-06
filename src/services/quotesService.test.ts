@@ -11,6 +11,7 @@ import {
   listQuotes,
   QuoteNotFoundError,
   quotesSnapshot,
+  reopenQuotes,
   updateQuote,
   updateQuoteStatus,
 } from './quotesService';
@@ -140,5 +141,13 @@ describe('excluir orçamentos', () => {
     expect(await cancelQuotes([sent.id, pending.id], { remove: true })).toBe(1);
     expect(quotesSnapshot().some((q) => q.id === sent.id)).toBe(false);
     expect(quotesSnapshot().some((q) => q.id === pending.id)).toBe(true);
+  });
+
+  it('reabre como pendentes só os cancelados', async () => {
+    const cancelled = quotesSnapshot().find((q) => q.status === 'Cancelado')!;
+    const approved = quotesSnapshot().find((q) => q.status === 'Aprovado')!;
+    expect(await reopenQuotes([cancelled.id, approved.id])).toBe(1);
+    expect(quotesSnapshot().find((q) => q.id === cancelled.id)!.status).toBe('Pendente');
+    expect(quotesSnapshot().find((q) => q.id === approved.id)!.status).toBe('Aprovado');
   });
 });

@@ -365,6 +365,44 @@
   background: var(--subtle);
 }
 
+/* Capa clicável: abre as fotos. */
+.thumbBtn {
+  position: relative;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: zoom-in;
+}
+
+.thumbBtn:hover .thumb {
+  opacity: 0.85;
+}
+
+.thumbBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Quantas fotos o produto tem, quando mais de uma. */
+.thumbCount {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border: 2px solid var(--surface);
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 14px;
+  text-align: center;
+}
+
 .thumbEmpty {
   display: grid;
   place-items: center;
@@ -401,14 +439,9 @@
   margin: 0 24px 12px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: var(--err-bg);
+  background: var(--subtle);
   font-size: 13px;
   color: var(--text-2);
-}
-
-/* Cancelar em lote: mesma faixa, sem o tom de alerta. */
-.bulkNeutral {
-  background: var(--subtle);
 }
 
 .bulkDanger {

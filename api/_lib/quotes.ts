@@ -347,6 +347,24 @@ export async function cancelQuotes(
   return { cancelled: rows.length, deleted: 0 };
 }
 
+/** Reabre em lote, como pendentes, os cancelados entre `ids`; o vendedor só mexe nos próprios. */
+export async function reopenQuotes(ids: readonly string[], me: Caller): Promise<{ reopened: number }> {
+  const seller = me.access.role === 'Vendedor' ? (me.access.sellerId ?? '0') : null;
+  const rows = await db()`
+    with q as (
+      update quotes set status = 'Pendente'
+      where id = any(${ids}::bigint[]) and status = 'Cancelado'
+        and (${seller}::bigint is null or seller_id = ${seller}::bigint)
+      returning id
+    ),
+    e as (
+      insert into quote_events (quote_id, status, note, user_id, user_name)
+      select id, 'Pendente', 'Voltou para pendente', ${me.id}::bigint, ${me.session.name} from q
+    )
+    select id from q`;
+  return { reopened: rows.length };
+}
+
 /** Um orçamento: só se estiver cancelado. */
 export async function deleteQuote(id: string, me: Caller): Promise<void> {
   const status = await currentStatus(id, me.access);

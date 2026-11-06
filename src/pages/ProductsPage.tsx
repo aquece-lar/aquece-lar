@@ -6,6 +6,7 @@ import { ListToolbar } from '@/features/people/ListToolbar';
 import { Modal } from '@/features/people/Modal';
 import { RowMenu } from '@/features/people/RowMenu';
 import { matches, useList } from '@/features/people/useList';
+import { PhotoViewer } from '@/features/products/PhotoViewer';
 import { ProductForm, type ProductDraft } from '@/features/products/ProductForm';
 import { formatBRL } from '@/lib/format';
 import { newId } from '@/services/peopleService';
@@ -25,9 +26,24 @@ function StatusBadge({ status }: { status: ProductStatus }) {
   return <span className={`${styles.badge} ${status === 'Ativo' ? styles.ok : styles.off}`}>{status}</span>;
 }
 
-function Thumb({ src }: { src?: string }) {
+/** Capa do produto; com foto, abre as fotos em tamanho grande. */
+function Thumb({ product, onOpen }: { product: Product; onOpen: (product: Product) => void }) {
+  const src = product.photos?.[0];
+  const count = product.photos?.length ?? 0;
   return src ? (
-    <img src={src} alt="" className={styles.thumb} />
+    <button
+      type="button"
+      className={styles.thumbBtn}
+      onClick={() => onOpen(product)}
+      aria-label={`Ver ${count === 1 ? 'a foto' : `as ${count} fotos`} de ${product.description}`}
+    >
+      <img src={src} alt="" className={styles.thumb} />
+      {count > 1 && (
+        <span className={styles.thumbCount} aria-hidden="true">
+          {count}
+        </span>
+      )}
+    </button>
   ) : (
     <span className={`${styles.thumb} ${styles.thumbEmpty}`} aria-hidden="true">
       <Icon name="image" size={16} />
@@ -47,6 +63,7 @@ export function ProductsPage() {
   const [form, setForm] = useState<{ item?: Product } | null>(null);
   const [formError, setFormError] = useState('');
   const [toDelete, setToDelete] = useState<Product | null>(null);
+  const [viewing, setViewing] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
 
   const all = state.data;
@@ -160,7 +177,7 @@ export function ProductsPage() {
                       <tr key={product.id} className={styles.row}>
                         <td>
                           <span className={styles.productCell}>
-                            <Thumb src={product.photos?.[0]} />
+                            <Thumb product={product} onOpen={setViewing} />
                             <span className={styles.personText}>
                               <span className={styles.name}>{product.description}</span>
                               <span className={styles.detail}>{product.code}</span>
@@ -192,7 +209,7 @@ export function ProductsPage() {
                   <li key={product.id} className={styles.itemCard}>
                     <div className={styles.cardTop}>
                       <span className={styles.productCell}>
-                        <Thumb src={product.photos?.[0]} />
+                        <Thumb product={product} onOpen={setViewing} />
                         <span className={styles.personText}>
                           <span className={styles.name}>{product.description}</span>
                           <span className={styles.detail}>
@@ -231,6 +248,8 @@ export function ProductsPage() {
           onCancel={() => setForm(null)}
         />
       </Modal>
+
+      <PhotoViewer product={viewing} onClose={() => setViewing(null)} />
 
       <ConfirmDelete
         name={toDelete ? `${toDelete.code} · ${toDelete.description}` : null}

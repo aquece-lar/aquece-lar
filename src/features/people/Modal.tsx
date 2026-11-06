@@ -7,7 +7,7 @@ interface ModalProps {
   title: string;
   onClose: () => void;
   children: ReactNode;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 /** Diálogo modal nativo: foco preso, Esc e clique fora fecham. */
@@ -25,7 +25,7 @@ export function Modal({ open, title, onClose, children, size = 'md' }: ModalProp
   return (
     <dialog
       ref={ref}
-      className={`${styles.dialog} ${size === 'sm' ? styles.sm : ''}`}
+      className={`${styles.dialog} ${size === 'md' ? '' : styles[size]}`}
       aria-labelledby={titleId}
       onClose={onClose}
       onClick={(event) => {

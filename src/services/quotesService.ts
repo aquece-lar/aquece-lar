@@ -225,6 +225,26 @@ export async function cancelQuotes(ids: readonly string[], { remove = false } = 
   });
 }
 
+/** Reabre como pendentes os cancelados entre `ids` (os outros ficam); devolve quantos voltaram. */
+export async function reopenQuotes(ids: readonly string[]): Promise<number> {
+  if (!USE_MOCKS) return (await api<{ reopened: number }>('POST', '/quotes/reopen', { ids })).reopened;
+  return fromMock(() => {
+    const access = mockAccess();
+    const hit = new Set(
+      quotes
+        .filter((q) => ids.includes(q.id) && q.status === 'Cancelado')
+        .filter((q) => access.role !== 'Vendedor' || q.seller === access.sellerName)
+        .map((q) => q.id),
+    );
+    const at = new Date().toISOString();
+    quotes = quotes.map((q) => (hit.has(q.id) ? { ...q, status: 'Pendente' } : q));
+    for (const id of hit) {
+      history.set(id, [...(history.get(id) ?? []), { status: 'Pendente', at, note: STATUS_NOTES.Pendente, by: mockUserName(), detail: '' }]);
+    }
+    return hit.size;
+  });
+}
+
 /** Apaga de vez os cancelados entre `ids` (os de outro status ficam); devolve quantos saíram. */
 export async function deleteCancelledQuotes(ids: readonly string[]): Promise<number> {
   if (!USE_MOCKS) return (await api<{ deleted: number }>('DELETE', '/quotes', { ids })).deleted;

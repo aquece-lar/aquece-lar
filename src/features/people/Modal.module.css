@@ -17,6 +17,10 @@
   width: min(420px, calc(100vw - 32px));
 }
 
+.lg {
+  width: min(880px, calc(100vw - 32px));
+}
+
 .body {
   padding: 22px 24px 24px;
   display: flex;
