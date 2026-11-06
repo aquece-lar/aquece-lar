@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { useUserName } from '@/contexts/AuthContext';
-import { listNotifications, readSeen, saveSeen } from '@/services/notificationsService';
+import checkStyles from '@/features/settings/UserForm.module.css';
+import { dismissNotifications, listNotifications, readSeen, saveSeen } from '@/services/notificationsService';
 import type { Notification } from '@/types/notifications';
 import styles from './Topbar.module.css';
 
@@ -14,20 +15,40 @@ function daysLabel(days: number): string {
   return days === 1 ? '1 dia' : `${days} dias`;
 }
 
-/** Sininho do topo: conta os avisos ainda não vistos e abre a lista. */
+function NoticeText({ n }: { n: Notification }) {
+  return (
+    <>
+      <span className={styles.noticeText}>
+        <span className={styles.noticeTitle}>{n.title}</span>
+        <span className={styles.noticeMessage}>{n.message}</span>
+      </span>
+      <span className={styles.noticeDays}>
+        {n.quote.days > 0 && <Icon name="clock" size={12} />}
+        {daysLabel(n.quote.days)}
+      </span>
+    </>
+  );
+}
+
+/** Sininho do topo: conta os avisos ainda não vistos, lista, e deixa excluir alguns ou limpar todos. */
 export function NotificationsMenu() {
   const { email } = useUserName();
   const [items, setItems] = useState<Notification[] | null>(null);
   const [seen, setSeen] = useState<Set<string>>(() => readSeen(email));
   const [open, setOpen] = useState(false);
+  /** `null` fora do modo de seleção; senão, os ids marcados. */
+  const [selected, setSelected] = useState<Set<string> | null>(null);
+  const [confirmingAll, setConfirmingAll] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
   const load = useCallback((signal?: AbortSignal) => {
     listNotifications(signal)
       .then(setItems)
-      .catch((error: unknown) => {
-        if (!signal?.aborted) console.error('Não foi possível carregar os avisos', error);
+      .catch((reason: unknown) => {
+        if (!signal?.aborted) console.error('Não foi possível carregar os avisos', reason);
       });
   }, []);
 
@@ -54,6 +75,14 @@ export function NotificationsMenu() {
     setSeen(new Set(ids));
   }, [open, items, email]);
 
+  // Ao fechar, sai da seleção e da confirmação.
+  useEffect(() => {
+    if (open) return;
+    setSelected(null);
+    setConfirmingAll(false);
+    setError('');
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onPointerDown(event: PointerEvent) {
@@ -73,8 +102,35 @@ export function NotificationsMenu() {
     };
   }, [open]);
 
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function dismiss(ids: readonly string[] | 'all') {
+    setBusy(true);
+    setError('');
+    try {
+      await dismissNotifications(ids);
+      setItems((prev) => (ids === 'all' ? [] : (prev ?? []).filter((n) => !ids.includes(n.id))));
+      setSelected(null);
+      setConfirmingAll(false);
+    } catch (reason) {
+      console.error('Não foi possível excluir os avisos', reason);
+      setError('Não foi possível excluir agora. Tente novamente.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const unread = (items ?? []).filter((n) => !seen.has(n.id)).length;
   const label = unread > 0 ? `Notificações, ${unread} ${unread === 1 ? 'nova' : 'novas'}` : 'Notificações';
+  const picked = selected ? (items ?? []).filter((n) => selected.has(n.id)).map((n) => n.id) : [];
+  const hasItems = Boolean(items && items.length > 0);
 
   return (
     <div ref={wrapRef} className={styles.userWrap}>
@@ -96,10 +152,54 @@ export function NotificationsMenu() {
       </button>
       {open && (
         <div className={`${styles.userMenu} ${styles.noticePanel}`} role="dialog" aria-label="Avisos">
-          <div className={styles.userMenuHead}>
-            <span className={styles.userMenuName}>Avisos</span>
-            <span className={styles.userMenuEmail}>Orçamentos em aberto perto de vencer</span>
+          <div className={`${styles.userMenuHead} ${styles.noticeHead}`}>
+            <span className={styles.noticeHeadText}>
+              <span className={styles.userMenuName}>Avisos</span>
+              <span className={styles.userMenuEmail}>Orçamentos em aberto perto de vencer</span>
+            </span>
+            {hasItems && !confirmingAll && (
+              <span className={styles.noticeActions}>
+                {selected ? (
+                  <button type="button" className={styles.noticeLink} onClick={() => setSelected(null)} disabled={busy}>
+                    Cancelar
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" className={styles.noticeLink} onClick={() => setSelected(new Set())}>
+                      Selecionar
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.noticeLink} ${styles.noticeDanger}`}
+                      onClick={() => setConfirmingAll(true)}
+                    >
+                      Limpar todas
+                    </button>
+                  </>
+                )}
+              </span>
+            )}
           </div>
+
+          {confirmingAll && (
+            <div className={styles.noticeConfirm} role="alert">
+              <span>Limpar todos os avisos? Eles só voltam se o orçamento mudar de validade.</span>
+              <span className={styles.noticeActions}>
+                <button type="button" className={styles.noticeLink} onClick={() => setConfirmingAll(false)} disabled={busy}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.noticeLink} ${styles.noticeDanger}`}
+                  onClick={() => void dismiss('all')}
+                  disabled={busy}
+                >
+                  {busy ? 'Limpando…' : 'Limpar'}
+                </button>
+              </span>
+            </div>
+          )}
+
           {items === null ? (
             <p className={styles.noticeEmpty}>Carregando…</p>
           ) : items.length === 0 ? (
@@ -108,19 +208,50 @@ export function NotificationsMenu() {
             <ul className={styles.noticeList}>
               {items.map((n) => (
                 <li key={n.id}>
-                  <Link to={n.link} className={styles.noticeItem} onClick={() => setOpen(false)}>
-                    <span className={styles.noticeText}>
-                      <span className={styles.noticeTitle}>{n.title}</span>
-                      <span className={styles.noticeMessage}>{n.message}</span>
-                    </span>
-                    <span className={styles.noticeDays}>
-                      {n.quote.days > 0 && <Icon name="clock" size={12} />}
-                      {daysLabel(n.quote.days)}
-                    </span>
-                  </Link>
+                  {selected ? (
+                    <label className={`${styles.noticeItem} ${styles.noticeSelectable}`}>
+                      <span className={`${checkStyles.check} ${styles.noticeCheck}`}>
+                        <input
+                          type="checkbox"
+                          className={checkStyles.checkInput}
+                          checked={selected.has(n.id)}
+                          onChange={() => toggle(n.id)}
+                          aria-label={`Selecionar: ${n.title}`}
+                        />
+                        <span className={checkStyles.checkBox} aria-hidden="true">
+                          <Icon name="check" size={14} />
+                        </span>
+                      </span>
+                      <NoticeText n={n} />
+                    </label>
+                  ) : (
+                    <Link to={n.link} className={styles.noticeItem} onClick={() => setOpen(false)}>
+                      <NoticeText n={n} />
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
+          )}
+
+          {error && (
+            <p className={styles.noticeError} role="alert">
+              {error}
+            </p>
+          )}
+
+          {selected && hasItems && (
+            <div className={styles.noticeFooter}>
+              <button
+                type="button"
+                className={`btn btn-secondary ${styles.noticeDeleteBtn}`}
+                onClick={() => void dismiss(picked)}
+                disabled={busy || picked.length === 0}
+              >
+                <Icon name="trash" size={16} />
+                {busy ? 'Excluindo…' : `Excluir selecionadas (${picked.length})`}
+              </button>
+            </div>
           )}
         </div>
       )}

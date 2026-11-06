@@ -112,4 +112,11 @@ export const SCHEMA: string[] = [
   `create index if not exists quote_events_at_idx on quote_events (at)`,
   // Apagar do histórico geral só esconde o evento: a linha do tempo do orçamento continua inteira.
   `alter table quote_events add column if not exists in_log boolean not null default true`,
+  // Avisos que cada usuário excluiu do sininho (o id muda se o orçamento ganhar outra validade).
+  `create table if not exists notification_dismissals (
+    user_id         bigint not null references users (id) on delete cascade,
+    notification_id text not null,
+    created_at      timestamptz not null default now(),
+    primary key (user_id, notification_id)
+  )`,
 ];
