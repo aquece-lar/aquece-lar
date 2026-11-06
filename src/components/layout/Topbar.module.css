@@ -135,6 +135,17 @@
   white-space: nowrap;
 }
 
+.userMenuRole {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 600;
+}
+
 .userMenuItem {
   height: 36px;
   padding: 0 10px;

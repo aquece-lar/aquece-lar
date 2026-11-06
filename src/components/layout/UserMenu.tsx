@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '@/components/Icon';
-import { useLogout, useUserName } from '@/contexts/AuthContext';
+import { useAccess, useLogout, useUserName } from '@/contexts/AuthContext';
 import styles from './Topbar.module.css';
 
 /** Botão com o nome de quem está conectado; abre o menu com "Sair". */
 export function UserMenu() {
   const user = useUserName();
   const logout = useLogout();
+  const access = useAccess();
+  // Vendedor mostra também o cadastro de vendedor ligado à conta.
+  const role = access.role === 'Vendedor' && access.sellerName ? `Vendedor · ${access.sellerName}` : access.role;
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -53,6 +56,7 @@ export function UserMenu() {
           <div className={styles.userMenuHead}>
             <span className={styles.userMenuName}>{user.name}</span>
             {user.email && <span className={styles.userMenuEmail}>{user.email}</span>}
+            <span className={styles.userMenuRole}>{role}</span>
           </div>
           <button
             type="button"
