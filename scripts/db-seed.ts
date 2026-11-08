@@ -1,9 +1,10 @@
 /**
  * Coloca no banco os mesmos dados de exemplo do modo fictício (vendedores,
- * clientes, produtos, configurações e orçamentos com itens e histórico).
+ * clientes, produtos, equivalências, configurações e orçamentos com itens e histórico).
  *   npm run db:seed            só num banco vazio
  *   npm run db:seed -- --reset apaga tudo antes
  */
+import { normalizeTerm } from '../src/lib/equivalence';
 import { quoteTotals } from '../src/lib/quoteTotals';
 import { db } from '../api/_lib/db.js';
 
@@ -11,6 +12,7 @@ import { db } from '../api/_lib/db.js';
 process.env.TZ = 'America/Sao_Paulo';
 const { SELLERS_MOCK, CUSTOMERS_MOCK } = await import('../src/services/mocks/peopleMock');
 const { PRODUCTS_MOCK } = await import('../src/services/mocks/productsMock');
+const { EQUIVALENCES_MOCK } = await import('../src/services/mocks/equivalencesMock');
 const { SETTINGS_MOCK } = await import('../src/services/mocks/settingsMock');
 const { QUOTES_MOCK } = await import('../src/services/mocks/quotesMock');
 const { buildHistory, buildQuoteDetail } = await import('../src/services/mocks/quoteDetailMock');
@@ -24,7 +26,7 @@ if (Number(total) > 0 && !reset) {
   process.exit(1);
 }
 if (reset) {
-  await sql`truncate quote_events, quotes, customers, products, sellers, settings restart identity cascade`;
+  await sql`truncate quote_events, quotes, customers, equivalences, products, sellers, settings restart identity cascade`;
 }
 
 // A listagem ordena por created_at decrescente: o primeiro do mock fica com o mais recente.
@@ -61,6 +63,24 @@ await sql.query(
         photos: p.photos ?? [],
         created_at: at(i),
         inactivated_at: p.status === 'Inativo' ? new Date(base + i * 1000).toISOString() : null,
+      })),
+    ),
+  ],
+);
+
+// Ligadas pelo código do produto (os ids do banco não são os do mock).
+await sql.query(
+  `insert into equivalences (term, normalized, product_id, brand)
+   select r.term, r.normalized, p.id, r.brand
+   from jsonb_to_recordset($1::jsonb) as r(term text, normalized text, product_code text, brand text)
+   join products p on p.code = r.product_code`,
+  [
+    JSON.stringify(
+      EQUIVALENCES_MOCK.map((e) => ({
+        term: e.term,
+        normalized: normalizeTerm(e.term),
+        product_code: e.productCode,
+        brand: e.brand,
       })),
     ),
   ],
@@ -112,6 +132,7 @@ await sql.query(
 
 const [counts] = await sql`
   select (select count(*) from sellers) as sellers, (select count(*) from customers) as customers,
-         (select count(*) from products) as products, (select count(*) from quotes) as quotes,
+         (select count(*) from products) as products, (select count(*) from equivalences) as equivalences,
+         (select count(*) from quotes) as quotes,
          (select count(*) from quote_events) as events`;
 console.log('Dados de exemplo inseridos:', counts);
