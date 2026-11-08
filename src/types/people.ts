@@ -1,3 +1,5 @@
+import type { Quote } from './quotes';
+
 export type SellerStatus = 'Ativo' | 'Inativo';
 
 export interface Seller {
@@ -29,4 +31,12 @@ export interface Customer {
   quotes: number;
   /** Data/hora ISO do último orçamento; `null` se ainda não houver. */
   lastQuoteAt: string | null;
+}
+
+/** Orçamentos de um cliente ou de um vendedor, para a ficha dele. */
+export interface QuoteHistory {
+  /** Do mais recente para o mais antigo. */
+  quotes: Quote[];
+  /** Último passo em qualquer desses orçamentos (criação, envio, aprovação…); `null` se não houver. */
+  lastActivityAt: string | null;
 }

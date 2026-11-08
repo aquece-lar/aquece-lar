@@ -18,6 +18,7 @@ import {
   deleteQuote,
   getQuote,
   listQuotes,
+  quoteHistory,
   updateQuote,
 } from './quotes.js';
 import { createSeller, deleteSeller, listSellers, updateSeller } from './sellers.js';
@@ -192,6 +193,13 @@ export async function handle(request: Request, path: string): Promise<Response> 
         return noContent();
       }
       throw METHOD_NOT_ALLOWED;
+    }
+
+    // Ficha do cliente ou do vendedor (a tela de vendedores é só de quem pode vê-la).
+    if ((resource === 'customers' || resource === 'sellers') && id && action === 'quotes') {
+      if (method !== 'GET') throw METHOD_NOT_ALLOWED;
+      if (resource === 'sellers') ensure(me.access, 'viewSellers');
+      return json(await quoteHistory(resource === 'customers' ? 'customer' : 'seller', id, me.access));
     }
 
     const crud = CRUD[resource];

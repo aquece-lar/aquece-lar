@@ -1,6 +1,7 @@
 import type { Access } from '../../src/types/auth';
 import { describeQuoteChanges } from '../../src/lib/changes.js';
 import type { Period, QuoteStatus } from '../../src/types/dashboard';
+import type { QuoteHistory } from '../../src/types/people';
 import type { Quote, QuoteContact, QuoteDetail, QuoteDiscount, QuoteEvent, QuoteItem } from '../../src/types/quotes';
 import { can, discountOverLimit, onlyOwn } from '../../src/lib/access.js';
 import { toISODate } from '../../src/lib/format.js';
@@ -134,6 +135,35 @@ export async function getQuote(id: string, access: Access): Promise<QuoteDetail>
       }),
     ),
   };
+}
+
+/**
+ * Ficha do cliente ou do vendedor: todos os orçamentos dele e a data do último
+ * passo. O vendedor que só vê o que é dele abre só os próprios clientes (os
+ * outros respondem 404) e vê só os próprios orçamentos.
+ */
+export async function quoteHistory(kind: 'customer' | 'seller', id: string, access: Access): Promise<QuoteHistory> {
+  if (kind === 'customer') {
+    const [customer] = await db()`select seller_id::text as seller_id from customers where id = ${id}`;
+    if (!customer || (onlyOwn(access) && customer.seller_id !== access.sellerId)) throw notFound('Cliente');
+  } else {
+    const [seller] = await db()`select id from sellers where id = ${id}`;
+    if (!seller) throw notFound('Vendedor');
+  }
+  const column = kind === 'customer' ? 'customer_id' : 'seller_id';
+  const own = ownSellerId(access);
+  const rows = await db().query(
+    `select ${LIST_COLUMNS} from quotes
+     where ${column} = $1 and ($2::bigint is null or seller_id = $2::bigint)
+     order by created_at desc, id desc`,
+    [id, own],
+  );
+  const [last] = await db().query(
+    `select max(e.at) as at from quote_events e join quotes q on q.id = e.quote_id
+     where q.${column} = $1 and ($2::bigint is null or q.seller_id = $2::bigint)`,
+    [id, own],
+  );
+  return { quotes: rows.map(toQuote), lastActivityAt: last?.at ? iso(last.at) : null };
 }
 
 function str(value: unknown, label: string, opts: { min?: number; max?: number } = {}): string {

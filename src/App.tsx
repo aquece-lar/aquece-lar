@@ -4,6 +4,7 @@ import { AuthProvider } from '@/contexts/AuthContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { RequireAuth } from '@/features/auth/RequireAuth';
 import { RequirePermission } from '@/features/auth/RequirePermission';
+import { CustomerProfilePage } from '@/pages/CustomerProfilePage';
 import { CustomersPage } from '@/pages/CustomersPage';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { LoginPage } from '@/pages/LoginPage';
@@ -12,6 +13,7 @@ import { ProductsPage } from '@/pages/ProductsPage';
 import { QuoteFormPage } from '@/pages/QuoteFormPage';
 import { QuotesPage } from '@/pages/QuotesPage';
 import { QuoteDetailPage } from '@/pages/QuoteDetailPage';
+import { SellerProfilePage } from '@/pages/SellerProfilePage';
 import { SellersPage } from '@/pages/SellersPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 
@@ -42,6 +44,15 @@ const router = createBrowserRouter(
             </RequirePermission>
           }
         />
+        <Route
+          path="vendedores/:id"
+          element={
+            <RequirePermission permission="viewSellers">
+              <SellerProfilePage />
+            </RequirePermission>
+          }
+        />
+        <Route path="clientes/:id" element={<CustomerProfilePage />} />
         <Route path="clientes" element={<CustomersPage />} />
         <Route path="produtos" element={<ProductsPage />} />
         <Route path="fluxogramas" element={<PlaceholderPage />} />

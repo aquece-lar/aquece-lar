@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { ConfirmDelete } from '@/features/people/ConfirmDelete';
 import { ListToolbar } from '@/features/people/ListToolbar';
@@ -156,7 +157,9 @@ export function SellersPage() {
                               {initials(seller.name)}
                             </span>
                             <span className={styles.personText}>
-                              <span className={styles.name}>{seller.name}</span>
+                              <Link to={`/vendedores/${seller.id}`} className={`${styles.name} ${styles.nameLink}`}>
+                                {seller.name}
+                              </Link>
                               <span className={styles.detail}>{seller.email}</span>
                             </span>
                           </div>
@@ -200,7 +203,9 @@ export function SellersPage() {
                           {initials(seller.name)}
                         </span>
                         <span className={styles.personText}>
-                          <span className={styles.name}>{seller.name}</span>
+                          <Link to={`/vendedores/${seller.id}`} className={`${styles.name} ${styles.nameLink}`}>
+                                {seller.name}
+                              </Link>
                           <span className={styles.detail}>{seller.region}</span>
                         </span>
                       </div>

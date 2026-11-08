@@ -39,6 +39,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 | `updateQuoteStatus(id, status)` | `POST /quotes/:id/status` | Detalhe |
 | `listSellers()` / `saveSeller()` / `deleteSeller(id)` | `GET` / `POST`·`PUT` / `DELETE /sellers[/:id]` | Vendedores, orçamento, clientes |
 | `listCustomers()` / `saveCustomer()` / `deleteCustomer(id)` | `GET` / `POST`·`PUT` / `DELETE /customers[/:id]` | Clientes, orçamento |
+| `customerHistory(id)` / `sellerHistory(id)` | `GET /customers/:id/quotes` / `GET /sellers/:id/quotes` → `{ quotes: Quote[], lastActivityAt }` (veja [Ficha do cliente e do vendedor](#ficha-do-cliente-e-do-vendedor)) | Ficha do cliente e do vendedor |
 | `listProducts()` / `saveProduct()` / `deleteProduct(id)` | `GET` / `POST`·`PUT` / `DELETE /products[/:id]` | Produtos, orçamento |
 | `getSettings()` / `saveSettings(settings)` | `GET` / `PUT /settings` | Configurações, orçamento, PDF |
 | `listActivity(area)` / `deleteActivity(ids \| 'all')` | `GET /activity[?area=]` / `DELETE /activity` (veja [Histórico de alterações](#histórico-de-alterações)) | Configurações → Histórico |
@@ -328,6 +329,16 @@ interface Activity {
 - Senhas nunca aparecem: só "senha trocada".
 - Salvar as configurações sem mudar nada não gera linha.
 - `DELETE /activity` com `{ ids: string[] }` (até 300) ou `{ all: true }` → `{ deleted }`. Linhas de configurações e usuários são apagadas; eventos de orçamento só saem do histórico geral (`quote_events.in_log = false`) e continuam na linha do tempo do orçamento. A limpeza vira uma linha nova ("Histórico apagado", com quantos itens e quem fez).
+
+---
+
+## Ficha do cliente e do vendedor
+
+`GET /customers/:id/quotes` e `GET /sellers/:id/quotes` devolvem todos os orçamentos ligados ao cadastro (pelo `customer_id` / `seller_id`), do mais recente para o mais antigo, e `lastActivityAt`: o último passo em qualquer deles (criação, edição, envio, aprovação…), ou `null`.
+
+- Os números da tela (total orçado, aprovado, em aberto, taxa de aprovação) saem de `src/lib/quoteStats.ts`. A taxa é aprovados ÷ (aprovados + cancelados): só conta o que o cliente já respondeu.
+- Vendedor que só vê o que é dele: a ficha de cliente de outro vendedor responde 404, e a lista traz só os orçamentos dele. A ficha de vendedor exige ver a tela de vendedores (403 para o perfil Vendedor).
+- Cadastro inexistente: 404 `not_found`.
 
 ---
 

@@ -535,3 +535,16 @@
     margin: 0 16px 12px;
   }
 }
+
+/* Nome que abre a ficha do cliente ou do vendedor. */
+.nameLink {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.nameLink:hover {
+  color: var(--brand);
+  text-decoration-color: currentColor;
+}

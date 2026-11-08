@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '@/components/Icon';
 import { useAccess } from '@/contexts/AuthContext';
 import { ConfirmDelete } from '@/features/people/ConfirmDelete';
@@ -161,7 +162,9 @@ export function CustomersPage() {
                               {initials(customer.name)}
                             </span>
                             <span className={styles.personText}>
-                              <span className={styles.name}>{customer.name}</span>
+                              <Link to={`/clientes/${customer.id}`} className={`${styles.name} ${styles.nameLink}`}>
+                                {customer.name}
+                              </Link>
                               {customer.document && <span className={styles.detail}>{customer.document}</span>}
                             </span>
                           </div>
@@ -200,7 +203,9 @@ export function CustomersPage() {
                           {initials(customer.name)}
                         </span>
                         <span className={styles.personText}>
-                          <span className={styles.name}>{customer.name}</span>
+                          <Link to={`/clientes/${customer.id}`} className={`${styles.name} ${styles.nameLink}`}>
+                                {customer.name}
+                              </Link>
                           {customer.document && <span className={styles.detail}>{customer.document}</span>}
                         </span>
                       </div>

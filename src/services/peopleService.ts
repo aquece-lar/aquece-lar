@@ -1,10 +1,10 @@
-import type { Customer, Seller } from '@/types/people';
+import type { Customer, QuoteHistory, Seller } from '@/types/people';
 import type { Quote } from '@/types/quotes';
 import { api, ApiError, isSavedId, USE_MOCKS } from './http';
 import { fromMock } from './mockLatency';
 import { mockAccess, mockEnsure, mockOwnSeller } from './mockSession';
 import { CUSTOMERS_MOCK, SELLERS_MOCK } from './mocks/peopleMock';
-import { quotesSnapshot } from './quotesService';
+import { quoteEventsSnapshot, quotesSnapshot } from './quotesService';
 
 /**
  * Modo fictício (testes): cópias em memória dos mocks, que valem até a página
@@ -105,4 +105,41 @@ export function deleteCustomer(id: string): Promise<void> {
     mockEnsure('deleteRecords');
     customers = customers.filter((c) => c.id !== id);
   });
+}
+
+/** Orçamentos (mais recentes primeiro) e data do último passo, no modo fictício; liga por nome, como os mocks. */
+function mockHistory(belongs: (quote: Quote) => boolean): QuoteHistory {
+  const own = mockOwnSeller();
+  const list = quotesSnapshot()
+    .filter((q) => belongs(q) && (own === null || q.seller === own))
+    .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+  const ids = new Set(list.map((q) => q.id));
+  const lastActivityAt = quoteEventsSnapshot()
+    .filter(({ quote }) => ids.has(quote.id))
+    .reduce<string | null>((latest, { event }) => (!latest || event.at > latest ? event.at : latest), null);
+  return { quotes: list, lastActivityAt };
+}
+
+/** Ficha do cliente. O vendedor que só vê o que é dele abre só os próprios clientes (os outros: 404). */
+export function customerHistory(id: string, signal?: AbortSignal): Promise<QuoteHistory> {
+  if (!USE_MOCKS) return api<QuoteHistory>('GET', `/customers/${id}/quotes`, undefined, signal);
+  return fromMock(() => {
+    const own = mockOwnSeller();
+    const customer = customers.find((c) => c.id === id);
+    if (!customer || (own !== null && customer.seller !== own)) {
+      throw new ApiError(404, 'not_found', 'Cliente não encontrado.');
+    }
+    return mockHistory((q) => q.customer === customer.name);
+  }, signal);
+}
+
+/** Ficha do vendedor; só para quem pode ver a tela de vendedores. */
+export function sellerHistory(id: string, signal?: AbortSignal): Promise<QuoteHistory> {
+  if (!USE_MOCKS) return api<QuoteHistory>('GET', `/sellers/${id}/quotes`, undefined, signal);
+  return fromMock(() => {
+    mockEnsure('viewSellers');
+    const seller = sellers.find((x) => x.id === id);
+    if (!seller) throw new ApiError(404, 'not_found', 'Vendedor não encontrado.');
+    return mockHistory((q) => q.seller === seller.name);
+  }, signal);
 }

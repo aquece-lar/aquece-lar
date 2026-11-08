@@ -5,21 +5,43 @@ import { formatBRL, formatDateTime } from '@/lib/format';
 import { QuoteStatusBadge } from './QuoteStatusBadge';
 import styles from './RecentQuotesTable.module.css';
 
-export function RecentQuotesTable({ quotes }: { quotes: RecentQuote[] }) {
+interface RecentQuotesTableProps {
+  quotes: RecentQuote[];
+  title?: string;
+  /** Link "ver todos" do cabeçalho; `null` esconde. */
+  link?: { to: string; label: string } | null;
+  /** Coluna repetida na tela (ex.: o cliente, na ficha do cliente). */
+  hide?: 'customer' | 'seller';
+  empty?: string;
+}
+
+const TITLE_ID = 'ultimos-orcamentos-titulo';
+
+export function RecentQuotesTable({
+  quotes,
+  title = 'Últimos 10 orçamentos',
+  link = { to: '/orcamentos', label: 'Ver todos os orçamentos' },
+  hide,
+  empty = 'Nenhum orçamento recente.',
+}: RecentQuotesTableProps) {
+  const showCustomer = hide !== 'customer';
+  const showSeller = hide !== 'seller';
   return (
-    <section className={`card ${styles.card}`} aria-labelledby="ultimos-orcamentos-titulo">
+    <section className={`card ${styles.card}`} aria-labelledby={TITLE_ID}>
       <div className={styles.head}>
-        <h2 id="ultimos-orcamentos-titulo" className={styles.title}>
-          Últimos 10 orçamentos
+        <h2 id={TITLE_ID} className={styles.title}>
+          {title}
         </h2>
-        <Link to="/orcamentos" className="link-strong">
-          Ver todos os orçamentos
-          <Icon name="chevRight" size={14} />
-        </Link>
+        {link && (
+          <Link to={link.to} className="link-strong">
+            {link.label}
+            <Icon name="chevRight" size={14} />
+          </Link>
+        )}
       </div>
 
       {quotes.length === 0 ? (
-        <p className={styles.empty}>Nenhum orçamento recente.</p>
+        <p className={styles.empty}>{empty}</p>
       ) : (
         <>
           <div className={styles.scroll}>
@@ -27,8 +49,8 @@ export function RecentQuotesTable({ quotes }: { quotes: RecentQuote[] }) {
               <thead>
                 <tr>
                   <th scope="col">Nº</th>
-                  <th scope="col">Cliente</th>
-                  <th scope="col">Vendedor</th>
+                  {showCustomer && <th scope="col">Cliente</th>}
+                  {showSeller && <th scope="col">Vendedor</th>}
                   <th scope="col" className={styles.num}>
                     Valor
                   </th>
@@ -43,8 +65,8 @@ export function RecentQuotesTable({ quotes }: { quotes: RecentQuote[] }) {
                 {quotes.map((quote) => (
                   <tr key={quote.id} className={styles.row}>
                     <td className={styles.number}>{quote.number}</td>
-                    <td>{quote.customer}</td>
-                    <td className={styles.muted}>{quote.seller}</td>
+                    {showCustomer && <td>{quote.customer}</td>}
+                    {showSeller && <td className={styles.muted}>{quote.seller}</td>}
                     <td className={styles.num}>{formatBRL(quote.amount)}</td>
                     <td>
                       <QuoteStatusBadge status={quote.status} />
@@ -81,9 +103,10 @@ export function RecentQuotesTable({ quotes }: { quotes: RecentQuote[] }) {
                   <span className={styles.number}>{quote.number}</span>
                   <QuoteStatusBadge status={quote.status} />
                 </div>
-                <p className={styles.cardCustomer}>{quote.customer}</p>
+                {showCustomer && <p className={styles.cardCustomer}>{quote.customer}</p>}
                 <p className={styles.cardMeta}>
-                  {quote.seller} · {formatDateTime(quote.createdAt)}
+                  {showSeller && `${quote.seller} · `}
+                  {formatDateTime(quote.createdAt)}
                 </p>
                 <div className={styles.cardFoot}>
                   <span className={styles.cardAmount}>{formatBRL(quote.amount)}</span>
