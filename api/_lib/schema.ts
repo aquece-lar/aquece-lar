@@ -123,4 +123,15 @@ export const SCHEMA: string[] = [
   `alter table activity_log drop constraint if exists activity_log_area_check`,
   `alter table activity_log add constraint activity_log_area_check
     check (area in ('Orçamentos', 'Clientes', 'Vendedores', 'Produtos', 'Configurações', 'Usuários'))`,
+  // Equivalências: como o cliente chama um produto, ou o código de outra marca (src/types/equivalences.ts).
+  // `normalized` é o termo sem acento e minúsculo (src/lib/equivalence.ts), para não repetir no mesmo produto.
+  `create table if not exists equivalences (
+    id         bigint generated always as identity primary key,
+    term       text not null,
+    normalized text not null,
+    product_id bigint not null references products (id) on delete cascade,
+    brand      text not null default '',
+    created_at timestamptz not null default now()
+  )`,
+  `create unique index if not exists equivalences_term_key on equivalences (product_id, normalized)`,
 ];

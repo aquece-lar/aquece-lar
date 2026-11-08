@@ -13,6 +13,7 @@ import { useQuote } from '@/features/quotes/useQuote';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, initials, toISODate } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
+import { listEquivalences } from '@/services/equivalencesService';
 import { listCustomers, listSellers, newId, saveCustomer } from '@/services/peopleService';
 import { listProducts } from '@/services/productsService';
 import { ApiError } from '@/services/http';
@@ -190,11 +191,13 @@ interface QuoteFormProps {
   /** Só vendedores ativos. */
   sellers: Seller[];
   catalog: CatalogProduct[];
+  /** Equivalências por código de produto: a busca do produto também acha por elas. */
+  aliases: ReadonlyMap<string, string[]>;
   /** Valores iniciais de um orçamento novo (validade, pagamento, observações). */
   defaults: QuoteDefaults;
 }
 
-function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, defaults }: QuoteFormProps) {
+function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, aliases, defaults }: QuoteFormProps) {
   const navigate = useNavigate();
   const text = headText(mode, base?.number ?? '');
   const backTo = base ? `/orcamentos/${base.id}` : '/orcamentos';
@@ -280,8 +283,14 @@ function QuoteForm({ mode, base, customers: loadedCustomers, sellers, catalog, d
   const units = lines.reduce((sum, line) => sum + (Number(line.quantity) || 0), 0);
   const today = toISODate(new Date());
   const productOptions = useMemo(
-    () => catalog.map((p) => ({ id: p.code, name: `${p.code} · ${p.description}`, hint: formatBRL(p.unitPrice) })),
-    [catalog],
+    () =>
+      catalog.map((p) => ({
+        id: p.code,
+        name: `${p.code} · ${p.description}`,
+        hint: formatBRL(p.unitPrice),
+        keywords: aliases.get(p.code),
+      })),
+    [catalog, aliases],
   );
 
   // Compara com o estado inicial para saber se há algo a perder ao sair.
@@ -762,6 +771,13 @@ export function QuoteFormPage({ mode }: { mode: QuoteFormMode }) {
   const productsState = useList(listProducts, 'Não foi possível carregar os produtos.', reloadKey);
   const baseState = useQuote(mode === 'new' ? null : id, reloadKey);
   const settingsState = useSettings(reloadKey);
+  // Não segura o formulário: sem as equivalências, a busca só não acha pelos apelidos.
+  const equivalencesState = useList(listEquivalences, 'Não foi possível carregar as equivalências.');
+  const aliases = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const e of equivalencesState.data ?? []) map.set(e.productCode, [...(map.get(e.productCode) ?? []), e.term]);
+    return map;
+  }, [equivalencesState.data]);
 
   const activeSellers = useMemo(
     () => (sellersState.data ?? []).filter((s) => s.status === 'Ativo'),
@@ -828,6 +844,7 @@ export function QuoteFormPage({ mode }: { mode: QuoteFormMode }) {
         customers={customers}
         sellers={activeSellers}
         catalog={catalog}
+        aliases={aliases}
         defaults={settings.quotes}
       />
     );

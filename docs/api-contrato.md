@@ -39,6 +39,7 @@ O objetivo é que a API devolva os dados no formato abaixo para que a troca seja
 | `updateQuoteStatus(id, status)` | `POST /quotes/:id/status` | Detalhe |
 | `listSellers()` / `saveSeller()` / `deleteSeller(id)` | `GET` / `POST`·`PUT` / `DELETE /sellers[/:id]` | Vendedores, orçamento, clientes |
 | `listCustomers()` / `saveCustomer()` / `deleteCustomer(id)` | `GET` / `POST`·`PUT` / `DELETE /customers[/:id]` | Clientes, orçamento |
+| `listEquivalences()` / `saveEquivalence(id, draft)` / `deleteEquivalence(id)` | `GET` / `POST`·`PUT` / `DELETE /equivalences[/:id]` (veja [Equivalências](#equivalências)) | Equivalências, busca do orçamento |
 | `customerHistory(id)` / `sellerHistory(id)` | `GET /customers/:id/quotes` / `GET /sellers/:id/quotes` → `{ quotes: Quote[], lastActivityAt }` (veja [Ficha do cliente e do vendedor](#ficha-do-cliente-e-do-vendedor)) | Ficha do cliente e do vendedor |
 | `listProducts()` / `saveProduct()` / `deleteProduct(id)` | `GET` / `POST`·`PUT` / `DELETE /products[/:id]` | Produtos, orçamento |
 | `getSettings()` / `saveSettings(settings)` | `GET` / `PUT /settings` | Configurações, orçamento, PDF |
@@ -329,6 +330,31 @@ interface Activity {
 - Senhas nunca aparecem: só "senha trocada".
 - Salvar as configurações sem mudar nada não gera linha.
 - `DELETE /activity` com `{ ids: string[] }` (até 300) ou `{ all: true }` → `{ deleted }`. Linhas de configurações e usuários são apagadas; eventos de orçamento só saem do histórico geral (`quote_events.in_log = false`) e continuam na linha do tempo do orçamento. A limpeza vira uma linha nova ("Histórico apagado", com quantos itens e quem fez).
+
+---
+
+## Equivalências — `/equivalences`
+
+Como o cliente chama um produto do catálogo: um apelido ("aquecedor 20 litros") ou o código de outra marca ("REU-1002", com `brand: "Rinnai"`).
+
+```ts
+interface Equivalence {
+  id: string;
+  term: string;               // até 120 caracteres
+  productId: string;
+  productCode: string;        // do produto, como está agora no cadastro
+  productDescription: string;
+  productActive: boolean;
+  brand: string;              // vazio = apelido
+}
+// Corpo do POST/PUT: { term, productId, brand }
+```
+
+- `GET` aberto a todos os perfis (a busca do orçamento usa); criar, editar e excluir: gerente e administrador (`manageCatalog`, senão 403).
+- O mesmo termo (sem acento e sem diferenciar maiúsculas) não aponta duas vezes para o mesmo produto: 409 `duplicate_equivalence`. Para produtos diferentes pode.
+- Excluir o produto exclui as equivalências dele.
+- Cada criação, edição e exclusão vai para o histórico (área Produtos): "Termo “aquecedor 20 litros” (AQG-20D) cadastrado".
+- **Para o bot:** `findProducts(frase, equivalências)` em `src/lib/equivalence.ts` diz quais produtos uma mensagem do cliente cita. Cada termo precisa aparecer inteiro na frase, palavra por palavra, sem acento e pontuação; termos mais longos vêm primeiro. É a regra da caixa "Testar" da tela. Hoje a rota exige o login de um usuário; se o bot rodar fora do sistema, combinar como ele se autentica (por exemplo, uma chave própria).
 
 ---
 

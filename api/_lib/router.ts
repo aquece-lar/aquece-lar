@@ -1,10 +1,23 @@
 import type { LoggedArea } from '../../src/types/activity';
 import type { Access } from '../../src/types/auth';
-import { describeCustomerChanges, describeProductChanges, describeSellerChanges } from '../../src/lib/changes.js';
+import {
+  describeCustomerChanges,
+  describeEquivalenceChanges,
+  describeProductChanges,
+  describeSellerChanges,
+} from '../../src/lib/changes.js';
+import { equivalenceTitle } from '../../src/lib/equivalence.js';
 import { can, type Permission } from '../../src/lib/access.js';
 import { deleteActivity, listActivity, logActivity } from './activity.js';
 import { caller, currentUser, forbidden, login, logout, type Caller } from './auth.js';
 import { createCustomer, deleteCustomer, getCustomer, listCustomers, updateCustomer } from './customers.js';
+import {
+  createEquivalence,
+  deleteEquivalence,
+  getEquivalence,
+  listEquivalences,
+  updateEquivalence,
+} from './equivalences.js';
 import { getDashboard } from './dashboard.js';
 import { db } from './db.js';
 import { dismissNotifications, listNotifications } from './notifications.js';
@@ -111,6 +124,19 @@ const CRUD: Record<string, Crud> = {
     area: 'Produtos',
     title: (p) => `Produto ${p.code}`,
     changes: describeProductChanges,
+  }),
+  // Todos consultam (o bot e a busca do orçamento usam); só quem mexe no catálogo edita.
+  equivalences: logged({
+    list: listEquivalences,
+    create: createEquivalence,
+    update: updateEquivalence,
+    remove: deleteEquivalence,
+    get: getEquivalence,
+    write: 'manageCatalog',
+    removal: 'manageCatalog',
+    area: 'Produtos',
+    title: equivalenceTitle,
+    changes: describeEquivalenceChanges,
   }),
 };
 

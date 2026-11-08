@@ -11,6 +11,8 @@ export interface ComboboxOption {
   name: string;
   /** Linha secundária na lista (cidade, região); também entra na busca. */
   hint?: string;
+  /** Outros nomes que também acham a opção, sem aparecer na lista (ex.: equivalências do produto). */
+  keywords?: string[];
 }
 
 interface ComboboxProps {
@@ -43,7 +45,7 @@ export function Combobox({ id, options, value, onChange, placeholder, invalid, o
 
   // Com o nome escolhido no campo, a lista mostra todas as opções.
   const filtered =
-    text === (selected?.name ?? '') ? options : options.filter((o) => matches(text, o.name, o.hint ?? ''));
+    text === (selected?.name ?? '') ? options : options.filter((o) => matches(text, o.name, o.hint ?? '', ...(o.keywords ?? [])));
   const typed = text.trim();
   const canCreate = Boolean(onCreate) && typed !== '' && !options.some((o) => normalize(o.name) === normalize(typed));
   // A opção de cadastro fica depois das encontradas, com o índice seguinte.

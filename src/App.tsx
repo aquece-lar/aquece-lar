@@ -7,6 +7,7 @@ import { RequirePermission } from '@/features/auth/RequirePermission';
 import { CustomerProfilePage } from '@/pages/CustomerProfilePage';
 import { CustomersPage } from '@/pages/CustomersPage';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { EquivalencesPage } from '@/pages/EquivalencesPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 import { ProductsPage } from '@/pages/ProductsPage';
@@ -57,7 +58,7 @@ const router = createBrowserRouter(
         <Route path="produtos" element={<ProductsPage />} />
         <Route path="fluxogramas" element={<PlaceholderPage />} />
         <Route path="conversas" element={<PlaceholderPage />} />
-        <Route path="equivalencias" element={<PlaceholderPage />} />
+        <Route path="equivalencias" element={<EquivalencesPage />} />
         <Route
           path="configuracoes"
           element={

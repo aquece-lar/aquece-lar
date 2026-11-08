@@ -9,6 +9,11 @@ import { PRODUCTS_MOCK } from './mocks/productsMock';
 /** Modo fictício (testes): cópia em memória do cadastro, até recarregar a página. */
 let products = [...PRODUCTS_MOCK];
 
+/** Leitura direta no modo fictício, para as equivalências mostrarem o produto como está agora. */
+export function productsSnapshot(): readonly Product[] {
+  return products;
+}
+
 export class DuplicateProductCodeError extends Error {
   constructor(code: string) {
     super(`Já existe um produto com o código ${code}.`);

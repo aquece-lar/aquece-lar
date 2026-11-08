@@ -100,4 +100,26 @@ describe('Combobox', () => {
     await user.keyboard('{Enter}');
     expect(onCreate).toHaveBeenCalledWith('Brasa Nova');
   });
+
+  it('acha também pelas palavras-chave, que não aparecem na lista', async () => {
+    const user = userEvent.setup();
+    render(
+      <>
+        <label htmlFor="produto">Produto</label>
+        <Combobox
+          id="produto"
+          options={[
+            { id: 'AQG-20D', name: 'AQG-20D · Aquecedor a gás digital', keywords: ['aquecedor 20 litros'] },
+            { id: 'BLR-200', name: 'BLR-200 · Boiler 200 L' },
+          ]}
+          value=""
+          onChange={() => {}}
+          placeholder="Escolha"
+        />
+      </>,
+    );
+    await user.type(screen.getByRole('combobox', { name: 'Produto' }), '20 litros');
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['AQG-20D · Aquecedor a gás digital']);
+  });
 });
+

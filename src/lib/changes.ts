@@ -1,3 +1,4 @@
+import type { Equivalence } from '@/types/equivalences';
 import type { Customer, Seller } from '@/types/people';
 import type { Product } from '@/types/products';
 import type { QuoteDiscount, QuoteDraft, QuoteItem } from '@/types/quotes';
@@ -164,5 +165,13 @@ export function describeProductChanges(before: Product, after: Product): string 
         : `fotos: ${count(photos(before).length)} → ${count(photos(after).length)}`,
     );
   }
+  return join(changes);
+}
+
+export function describeEquivalenceChanges(before: Equivalence, after: Equivalence): string {
+  const changes: string[] = [];
+  diff(changes, 'termo', before.term, after.term);
+  diff(changes, 'produto', before.productCode, after.productCode);
+  diff(changes, 'marca', before.brand, after.brand);
   return join(changes);
 }
