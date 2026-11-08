@@ -39,7 +39,7 @@ export async function listSellers(access: Access): Promise<Seller[]> {
   return rows.map(toSeller);
 }
 
-async function getSeller(id: string): Promise<Seller> {
+export async function getSeller(id: string): Promise<Seller> {
   const rows = await db().query(`${SELECT} where s.id = $1 group by s.id`, [id]);
   if (!rows[0]) throw notFound('Vendedor');
   return toSeller(rows[0]);

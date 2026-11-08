@@ -1,5 +1,5 @@
 import type { Settings } from '../../src/types/settings';
-import { DEFAULT_NOTES, PAYMENT_TERMS, VALID_DAYS } from '../../src/config/quotes.js';
+import { DEFAULT_NOTES, DEFAULT_WHATSAPP_MESSAGE, PAYMENT_TERMS, VALID_DAYS } from '../../src/config/quotes.js';
 import { describeSettingsChanges } from '../../src/lib/changes.js';
 import { settingsProblem } from '../../src/lib/settingsRules.js';
 import { logActivity } from './activity.js';
@@ -10,7 +10,8 @@ import { invalid } from './http.js';
 /** Enquanto ninguém salvou, as configurações são as mesmas do modo fictício. */
 const DEFAULTS: Settings = {
   company: { name: 'Aquece Lar', document: '', phone: '', email: '', address: '', footer: '', logo: null },
-  quotes: { validDays: VALID_DAYS, paymentTerms: [...PAYMENT_TERMS], notes: DEFAULT_NOTES, maxDiscountPercent: 10, expiryAlertDays: 3, followUpDays: 3 },
+  quotes: { validDays: VALID_DAYS, paymentTerms: [...PAYMENT_TERMS], notes: DEFAULT_NOTES, maxDiscountPercent: 10, expiryAlertDays: 3, followUpDays: 3,
+    whatsappMessage: DEFAULT_WHATSAPP_MESSAGE },
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -47,6 +48,8 @@ function readSettings(body: Record<string, unknown>): Settings {
       expiryAlertDays: Number(quotes.expiryAlertDays),
       // Configurações salvas antes do lembrete existir ficam com o padrão.
       followUpDays: quotes.followUpDays === undefined ? DEFAULTS.quotes.followUpDays : Number(quotes.followUpDays),
+      // Idem para a mensagem do WhatsApp.
+      whatsappMessage: quotes.whatsappMessage === undefined ? DEFAULTS.quotes.whatsappMessage : str(quotes.whatsappMessage).trim(),
     },
   };
 }

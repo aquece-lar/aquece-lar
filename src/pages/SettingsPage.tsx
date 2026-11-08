@@ -5,6 +5,7 @@ import { useSettings } from '@/features/settings/useSettings';
 import { ActivitySection } from '@/features/settings/ActivitySection';
 import { UsersSection } from '@/features/settings/UsersSection';
 import { resizeImage } from '@/lib/image';
+import { fillWhatsappMessage, MAX_WHATSAPP_MESSAGE, WHATSAPP_FIELDS } from '@/lib/whatsapp';
 import { InvalidSettingsError, MAX_ALERT_DAYS, MAX_VALID_DAYS, saveSettings } from '@/services/settingsService';
 import type { CompanyInfo, Settings } from '@/types/settings';
 import formStyles from '@/features/people/Form.module.css';
@@ -29,6 +30,7 @@ interface FormState {
   followUpDays: string;
   terms: Term[];
   notes: string;
+  whatsapp: string;
 }
 
 interface Errors {
@@ -41,6 +43,7 @@ interface Errors {
   followUpDays?: string;
   terms?: string;
   term?: Record<number, string>;
+  whatsapp?: string;
 }
 
 function toForm(settings: Settings): FormState {
@@ -52,6 +55,7 @@ function toForm(settings: Settings): FormState {
     followUpDays: String(settings.quotes.followUpDays),
     terms: settings.quotes.paymentTerms.map((text, key) => ({ key, text })),
     notes: settings.quotes.notes,
+    whatsapp: settings.quotes.whatsappMessage,
   };
 }
 
@@ -74,6 +78,7 @@ function toSettings(form: FormState): Settings {
       maxDiscountPercent: form.maxDiscount.trim() === '' ? null : Number(form.maxDiscount),
       expiryAlertDays: Number(form.alertDays),
       followUpDays: Number(form.followUpDays),
+      whatsappMessage: form.whatsapp.trim(),
     },
   };
 }
@@ -111,7 +116,83 @@ function validate(form: FormState): Errors {
     seen.add(text);
   }
   if (Object.keys(term).length > 0) errors.term = term;
+  const message = form.whatsapp.trim();
+  if (!message) errors.whatsapp = 'Escreva a mensagem.';
+  else if (message.length > MAX_WHATSAPP_MESSAGE) errors.whatsapp = `No máximo ${MAX_WHATSAPP_MESSAGE} caracteres.`;
   return errors;
+}
+
+/** Orçamento de exemplo para a prévia da mensagem. */
+const SAMPLE = {
+  quote: { number: '#1181', amount: 18940, validUntil: '2026-11-30' },
+  customer: { name: 'Restaurante Brasa Viva' },
+  seller: { name: 'Carlos Menezes' },
+};
+
+/** Mensagem do WhatsApp: os botões dos campos entram onde está o cursor; embaixo, a prévia. */
+function WhatsappField({
+  value,
+  company,
+  error,
+  onChange,
+}: {
+  value: string;
+  company: string;
+  error?: string;
+  onChange: (value: string) => void;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  function insert(key: string) {
+    const area = ref.current;
+    const token = `{${key}}`;
+    const start = area?.selectionStart ?? value.length;
+    const end = area?.selectionEnd ?? value.length;
+    onChange(value.slice(0, start) + token + value.slice(end));
+    requestAnimationFrame(() => {
+      area?.focus();
+      area?.setSelectionRange(start + token.length, start + token.length);
+    });
+  }
+
+  return (
+    <div className={`${formStyles.field} ${formStyles.full}`}>
+      <label className={formStyles.label} htmlFor="mensagem-whatsapp">
+        Mensagem do WhatsApp
+      </label>
+      <textarea
+        id="mensagem-whatsapp"
+        ref={ref}
+        className={`${formStyles.input} ${styles.textarea}`}
+        rows={4}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={Boolean(error)}
+        aria-describedby="mensagem-whatsapp-campos"
+      />
+      {error && <p className={formStyles.error}>{error}</p>}
+      <div className={styles.fields} id="mensagem-whatsapp-campos">
+        <span className={styles.hint}>Inserir:</span>
+        {WHATSAPP_FIELDS.map((field) => (
+          <button
+            key={field.key}
+            type="button"
+            className={styles.fieldChip}
+            title={field.label}
+            onClick={() => insert(field.key)}
+          >
+            {`{${field.key}}`}
+          </button>
+        ))}
+      </div>
+      {value.trim() && (
+        <p className={styles.preview}>
+          <span className={styles.previewLabel}>Prévia</span>
+          {fillWhatsappMessage(value, { ...SAMPLE, company: company.trim() || 'sua empresa' })}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function LogoField({ value, onChange }: { value: string | null; onChange: (logo: string | null) => void }) {
@@ -481,6 +562,13 @@ function SettingsForm({ initial, onSaved }: { initial: Settings; onSaved: () => 
               onChange={(e) => change((prev) => ({ ...prev, notes: e.target.value }))}
             />
           </label>
+
+          <WhatsappField
+            value={form.whatsapp}
+            company={form.company.name}
+            error={errors.whatsapp}
+            onChange={(whatsapp) => change((prev) => ({ ...prev, whatsapp }))}
+          />
         </div>
       </section>
 

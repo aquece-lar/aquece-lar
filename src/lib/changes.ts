@@ -1,3 +1,5 @@
+import type { Customer, Seller } from '@/types/people';
+import type { Product } from '@/types/products';
 import type { QuoteDiscount, QuoteDraft, QuoteItem } from '@/types/quotes';
 import type { Settings } from '@/types/settings';
 import type { UserDraft } from '@/types/users';
@@ -98,6 +100,7 @@ export function describeSettingsChanges(before: Settings, after: Settings): stri
   diff(changes, 'aviso de vencimento', days(q.expiryAlertDays), days(r.expiryAlertDays));
   const followUp = (n: number) => (n === 0 ? 'desligado' : days(n));
   diff(changes, 'lembrete de retorno', followUp(q.followUpDays), followUp(r.followUpDays));
+  if (q.whatsappMessage !== r.whatsappMessage) changes.push('mensagem do WhatsApp alterada');
   return join(changes);
 }
 
@@ -116,5 +119,50 @@ export function describeUserChanges(before: UserSnapshot, after: UserSnapshot, p
   diff(changes, 'vê de todos', onOff(before.seeAll), onOff(after.seeAll));
   diff(changes, 'passa do desconto', onOff(before.exceedDiscount), onOff(after.exceedDiscount));
   if (passwordChanged) changes.push('senha trocada');
+  return join(changes);
+}
+
+// Cadastros: só os campos que a pessoa edita (as contagens de orçamentos não entram).
+
+export function describeSellerChanges(before: Seller, after: Seller): string {
+  const changes: string[] = [];
+  diff(changes, 'nome', before.name, after.name);
+  diff(changes, 'e-mail', before.email, after.email);
+  diff(changes, 'telefone', before.phone, after.phone);
+  diff(changes, 'região', before.region, after.region);
+  diff(changes, 'status', before.status, after.status);
+  const goal = (n: number | null) => (n === null ? 'sem meta' : formatBRL(n));
+  diff(changes, 'meta mensal', goal(before.monthlyGoal), goal(after.monthlyGoal));
+  return join(changes);
+}
+
+export function describeCustomerChanges(before: Customer, after: Customer): string {
+  const changes: string[] = [];
+  const kind = (k: Customer['kind']) => (k === 'PJ' ? 'empresa' : 'pessoa');
+  diff(changes, 'nome', before.name, after.name);
+  diff(changes, 'tipo', kind(before.kind), kind(after.kind));
+  diff(changes, 'CPF/CNPJ', before.document, after.document);
+  diff(changes, 'telefone', before.phone, after.phone);
+  diff(changes, 'cidade', before.city, after.city);
+  diff(changes, 'vendedor', before.seller, after.seller);
+  return join(changes);
+}
+
+export function describeProductChanges(before: Product, after: Product): string {
+  const changes: string[] = [];
+  diff(changes, 'código', before.code, after.code);
+  diff(changes, 'descrição', before.description, after.description);
+  diff(changes, 'categoria', before.category, after.category);
+  diff(changes, 'preço', formatBRL(before.unitPrice), formatBRL(after.unitPrice));
+  diff(changes, 'status', before.status, after.status);
+  const photos = (p: Product) => p.photos ?? [];
+  if (photos(before).join('\n') !== photos(after).join('\n')) {
+    const count = (n: number) => `${n} ${n === 1 ? 'foto' : 'fotos'}`;
+    changes.push(
+      photos(before).length === photos(after).length
+        ? 'fotos alteradas'
+        : `fotos: ${count(photos(before).length)} → ${count(photos(after).length)}`,
+    );
+  }
   return join(changes);
 }

@@ -1,14 +1,16 @@
+import type { LoggedArea } from '../../src/types/activity';
 import type { Access } from '../../src/types/auth';
+import { describeCustomerChanges, describeProductChanges, describeSellerChanges } from '../../src/lib/changes.js';
 import { can, type Permission } from '../../src/lib/access.js';
-import { deleteActivity, listActivity } from './activity.js';
-import { caller, currentUser, forbidden, login, logout } from './auth.js';
-import { createCustomer, deleteCustomer, listCustomers, updateCustomer } from './customers.js';
+import { deleteActivity, listActivity, logActivity } from './activity.js';
+import { caller, currentUser, forbidden, login, logout, type Caller } from './auth.js';
+import { createCustomer, deleteCustomer, getCustomer, listCustomers, updateCustomer } from './customers.js';
 import { getDashboard } from './dashboard.js';
 import { db } from './db.js';
 import { dismissNotifications, listNotifications } from './notifications.js';
 import { ApiError, errorResponse, json, noContent, readBody } from './http.js';
 import { ensureSchema } from './migrate.js';
-import { createProduct, deleteProduct, listProducts, updateProduct } from './products.js';
+import { createProduct, deleteProduct, getProduct, listProducts, updateProduct } from './products.js';
 import {
   cancelQuotes,
   reopenQuotes,
@@ -21,45 +23,95 @@ import {
   quoteHistory,
   updateQuote,
 } from './quotes.js';
-import { createSeller, deleteSeller, listSellers, updateSeller } from './sellers.js';
+import { createSeller, deleteSeller, getSeller, listSellers, updateSeller } from './sellers.js';
 import { getSettings, saveSettings } from './settings.js';
 import { createUser, deleteUser, listUsers, updateUser } from './users.js';
 
 /** `write`/`remove`: permissão para criar e editar / excluir; sem ela, 403. Ler é livre (o filtro fica em `list`). */
 type Crud = {
   list: (access: Access) => Promise<unknown>;
-  create: (body: Record<string, unknown>, access: Access) => Promise<unknown>;
-  update: (id: string, body: Record<string, unknown>, access: Access) => Promise<unknown>;
-  remove: (id: string) => Promise<void>;
+  create: (body: Record<string, unknown>, me: Caller) => Promise<unknown>;
+  update: (id: string, body: Record<string, unknown>, me: Caller) => Promise<unknown>;
+  remove: (id: string, me: Caller) => Promise<void>;
   write?: Permission;
   removal: Permission;
 };
 
+/** Cadastro com histórico: cada criação, edição (com o que mudou) e exclusão vai para o activity_log. */
+function logged<T>(c: {
+  list: (access: Access) => Promise<unknown>;
+  create: (body: Record<string, unknown>, access: Access) => Promise<T>;
+  update: (id: string, body: Record<string, unknown>, access: Access) => Promise<T>;
+  remove: (id: string) => Promise<void>;
+  get: (id: string) => Promise<T>;
+  write?: Permission;
+  removal: Permission;
+  area: LoggedArea;
+  /** "Cliente Ana", "Produto AQG-20D". */
+  title: (item: T) => string;
+  changes: (before: T, after: T) => string;
+}): Crud {
+  return {
+    list: c.list,
+    write: c.write,
+    removal: c.removal,
+    async create(body, me) {
+      const item = await c.create(body, me.access);
+      await logActivity(me, c.area, `${c.title(item)} cadastrado`);
+      return item;
+    },
+    async update(id, body, me) {
+      const before = await c.get(id);
+      const after = await c.update(id, body, me.access);
+      const detail = c.changes(before, after);
+      if (detail) await logActivity(me, c.area, `${c.title(after)} editado`, detail);
+      return after;
+    },
+    async remove(id, me) {
+      const before = await c.get(id);
+      await c.remove(id);
+      await logActivity(me, c.area, `${c.title(before)} excluído`);
+    },
+  };
+}
+
 const CRUD: Record<string, Crud> = {
-  sellers: {
+  sellers: logged({
     list: listSellers,
     create: createSeller,
     update: updateSeller,
     remove: deleteSeller,
+    get: getSeller,
     write: 'manageCatalog',
     removal: 'manageCatalog',
-  },
+    area: 'Vendedores',
+    title: (s) => `Vendedor ${s.name}`,
+    changes: describeSellerChanges,
+  }),
   // O vendedor cadastra e edita os próprios clientes (a regra fica em customers.ts), mas não exclui.
-  customers: {
+  customers: logged({
     list: listCustomers,
     create: createCustomer,
     update: updateCustomer,
     remove: deleteCustomer,
+    get: getCustomer,
     removal: 'deleteRecords',
-  },
-  products: {
+    area: 'Clientes',
+    title: (c) => `Cliente ${c.name}`,
+    changes: describeCustomerChanges,
+  }),
+  products: logged({
     list: listProducts,
     create: createProduct,
     update: updateProduct,
     remove: deleteProduct,
+    get: getProduct,
     write: 'manageCatalog',
     removal: 'manageCatalog',
-  },
+    area: 'Produtos',
+    title: (p) => `Produto ${p.code}`,
+    changes: describeProductChanges,
+  }),
 };
 
 function ensure(access: Access, permission: Permission | undefined): void {
@@ -208,17 +260,17 @@ export async function handle(request: Request, path: string): Promise<Response> 
         if (method === 'GET') return json(await crud.list(me.access));
         if (method === 'POST') {
           ensure(me.access, crud.write);
-          return json(await crud.create(await readBody(request), me.access), 201);
+          return json(await crud.create(await readBody(request), me), 201);
         }
         throw METHOD_NOT_ALLOWED;
       }
       if (method === 'PUT') {
         ensure(me.access, crud.write);
-        return json(await crud.update(id, await readBody(request), me.access));
+        return json(await crud.update(id, await readBody(request), me));
       }
       if (method === 'DELETE') {
         ensure(me.access, crud.removal);
-        await crud.remove(id);
+        await crud.remove(id, me);
         return noContent();
       }
       throw METHOD_NOT_ALLOWED;

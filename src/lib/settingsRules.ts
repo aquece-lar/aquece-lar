@@ -1,4 +1,5 @@
 import type { Settings } from '@/types/settings';
+import { MAX_WHATSAPP_MESSAGE } from './whatsapp.js';
 
 export const MAX_VALID_DAYS = 365;
 export const MAX_ALERT_DAYS = 60;
@@ -26,5 +27,8 @@ export function settingsProblem(next: Settings): string | null {
   if (!Number.isInteger(followUp) || followUp < 0 || followUp > MAX_ALERT_DAYS) {
     return `O lembrete de retorno deve ser de 0 a ${MAX_ALERT_DAYS} dias.`;
   }
+  const message = next.quotes.whatsappMessage.trim();
+  if (!message) return 'Escreva a mensagem do WhatsApp.';
+  if (message.length > MAX_WHATSAPP_MESSAGE) return `A mensagem do WhatsApp pode ter no máximo ${MAX_WHATSAPP_MESSAGE} caracteres.`;
   return null;
 }

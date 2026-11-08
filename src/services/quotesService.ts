@@ -174,16 +174,18 @@ const STATUS_NOTES: Record<QuoteStatus, string> = {
   Cancelado: 'Orçamento cancelado',
 };
 
-export async function updateQuoteStatus(id: string, status: QuoteStatus): Promise<void> {
+/** `channel: 'whatsapp'`: enviado pelo botão do WhatsApp, e o histórico diz isso. */
+export async function updateQuoteStatus(id: string, status: QuoteStatus, channel?: 'whatsapp'): Promise<void> {
   if (!USE_MOCKS) {
-    await viaApi(() => api<QuoteDetail>('POST', `/quotes/${id}/status`, { status }), id);
+    await viaApi(() => api<QuoteDetail>('POST', `/quotes/${id}/status`, channel ? { status, channel } : { status }), id);
     return;
   }
   return fromMock(() => {
     ownQuote(id);
     quotes = quotes.map((q) => (q.id === id ? { ...q, status } : q));
     const events = history.get(id) ?? [];
-    history.set(id, [...events, { status, at: new Date().toISOString(), note: STATUS_NOTES[status], by: mockUserName(), detail: '' }]);
+    const note = status === 'Enviado' && channel === 'whatsapp' ? 'Enviado ao cliente por WhatsApp' : STATUS_NOTES[status];
+    history.set(id, [...events, { status, at: new Date().toISOString(), note, by: mockUserName(), detail: '' }]);
   });
 }
 

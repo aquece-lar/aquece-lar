@@ -1,6 +1,8 @@
 import type { Customer, QuoteHistory, Seller } from '@/types/people';
+import { describeCustomerChanges, describeSellerChanges } from '@/lib/changes';
 import type { Quote } from '@/types/quotes';
 import { api, ApiError, isSavedId, USE_MOCKS } from './http';
+import { recordMockActivity, recordMockSave } from './mockActivity';
 import { fromMock } from './mockLatency';
 import { mockAccess, mockEnsure, mockOwnSeller } from './mockSession';
 import { CUSTOMERS_MOCK, SELLERS_MOCK } from './mocks/peopleMock';
@@ -56,7 +58,9 @@ export function saveSeller(seller: Seller): Promise<Seller> {
   }
   return fromMock(() => {
     mockEnsure('manageCatalog');
+    const current = sellers.find((s) => s.id === seller.id);
     sellers = upsert(sellers, seller);
+    recordMockSave('Vendedores', `Vendedor ${seller.name}`, current, seller, describeSellerChanges);
     return seller;
   });
 }
@@ -65,7 +69,9 @@ export function deleteSeller(id: string): Promise<void> {
   if (!USE_MOCKS) return api<void>('DELETE', `/sellers/${id}`);
   return fromMock(() => {
     mockEnsure('manageCatalog');
+    const current = sellers.find((s) => s.id === id);
     sellers = sellers.filter((s) => s.id !== id);
+    if (current) recordMockActivity('Vendedores', `Vendedor ${current.name} excluído`);
   });
 }
 
@@ -87,14 +93,15 @@ export function saveCustomer(customer: Customer): Promise<Customer> {
     // O vendedor cadastra no próprio nome e só edita os clientes dele (como em api/_lib/customers.ts).
     const access = mockAccess();
     let saved = customer;
+    const current = customers.find((c) => c.id === customer.id);
     if (access.role === 'Vendedor') {
-      const current = customers.find((c) => c.id === customer.id);
       if (current && current.seller !== access.sellerName) {
         throw new ApiError(403, 'forbidden', 'Este cliente é de outro vendedor.');
       }
       saved = { ...customer, seller: access.sellerName ?? '' };
     }
     customers = upsert(customers, saved);
+    recordMockSave('Clientes', `Cliente ${saved.name}`, current, saved, describeCustomerChanges);
     return saved;
   });
 }
@@ -103,7 +110,9 @@ export function deleteCustomer(id: string): Promise<void> {
   if (!USE_MOCKS) return api<void>('DELETE', `/customers/${id}`);
   return fromMock(() => {
     mockEnsure('deleteRecords');
+    const current = customers.find((c) => c.id === id);
     customers = customers.filter((c) => c.id !== id);
+    if (current) recordMockActivity('Clientes', `Cliente ${current.name} excluído`);
   });
 }
 

@@ -113,4 +113,19 @@ describe('configurações', () => {
     expect(notes).toHaveValue(before);
     expect(screen.getByRole('button', { name: /salvar configurações/i })).toBeDisabled();
   });
+
+  it('mensagem do WhatsApp: insere campos, mostra a prévia e grava', async () => {
+    const user = await renderPage();
+    const message = screen.getByRole('textbox', { name: 'Mensagem do WhatsApp' });
+    await user.clear(message);
+    await user.type(message, 'Oi ');
+    await user.click(screen.getByRole('button', { name: '{cliente}' }));
+    expect(message).toHaveValue('Oi {cliente}');
+    expect(screen.getByText('Oi Restaurante Brasa Viva')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /salvar configurações/i }));
+    await screen.findByText('Configurações salvas.');
+    expect((await getSettings()).quotes.whatsappMessage).toBe('Oi {cliente}');
+  });
 });
+

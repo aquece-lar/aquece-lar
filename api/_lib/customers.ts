@@ -47,7 +47,7 @@ export async function customerSellerId(id: string): Promise<string | null> {
   return (row?.seller_id as string | null | undefined) ?? null;
 }
 
-async function getCustomer(id: string): Promise<Customer> {
+export async function getCustomer(id: string): Promise<Customer> {
   const rows = await db().query(`${SELECT} where c.id = $1 group by c.id, s.name`, [id]);
   if (!rows[0]) throw notFound('Cliente');
   return toCustomer(rows[0]);

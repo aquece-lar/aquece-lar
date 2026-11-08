@@ -25,6 +25,8 @@ export interface QuoteDefaults {
   expiryAlertDays: number;
   /** Dias depois do envio sem resposta para lembrar de falar com o cliente; 0 desliga. */
   followUpDays: number;
+  /** Texto do "Enviar por WhatsApp"; os `{campos}` ficam em `src/lib/whatsapp.ts`. */
+  whatsappMessage: string;
 }
 
 export interface Settings {

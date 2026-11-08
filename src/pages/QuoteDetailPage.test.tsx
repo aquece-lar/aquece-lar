@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { getSettings, saveSettings } from '@/services/settingsService';
 import { QuoteDetailPage } from './QuoteDetailPage';
 
@@ -63,5 +63,25 @@ describe('excluir orçamento', () => {
     renderQuote('1181');
     expect(await screen.findByRole('button', { name: 'Marcar como enviado' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Excluir' })).not.toBeInTheDocument();
+  });
+});
+
+describe('enviar por WhatsApp', () => {
+  it('abre o WhatsApp do cliente com a mensagem das configurações e marca como enviado', async () => {
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    const original = await getSettings();
+    await saveSettings({ ...original, quotes: { ...original.quotes, whatsappMessage: 'Oi {cliente}, orçamento {numero}: {total}' } });
+
+    renderQuote('1181');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Enviar por WhatsApp' }));
+
+    const url = new URL(open.mock.calls[0]![0] as string);
+    expect(url.origin + url.pathname).toBe('https://wa.me/555432221840');
+    expect(url.searchParams.get('text')).toMatch(/^Oi Restaurante Brasa Viva, orçamento #1181: R\$ /);
+    expect(await screen.findByText('Enviado ao cliente por WhatsApp')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reenviar por WhatsApp' })).toBeInTheDocument();
+    open.mockRestore();
+    await saveSettings(original);
   });
 });

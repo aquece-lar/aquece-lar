@@ -28,7 +28,7 @@ export async function listProducts(): Promise<Product[]> {
   return rows.map(toProduct);
 }
 
-async function getProduct(id: string): Promise<Product> {
+export async function getProduct(id: string): Promise<Product> {
   const rows = await db().query(`${SELECT} where id = $1`, [id]);
   if (!rows[0]) throw notFound('Produto');
   return toProduct(rows[0]);

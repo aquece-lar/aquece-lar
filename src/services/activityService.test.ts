@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { deleteActivity, listActivity } from './activityService';
 import { getQuote } from './quotesService';
+import { deleteCustomer, listSellers, saveCustomer, saveSeller } from './peopleService';
+import { listProducts, saveProduct } from './productsService';
 import { getSettings, saveSettings } from './settingsService';
 import { createUser, deleteUser } from './usersService';
 
@@ -55,5 +57,34 @@ describe('listActivity (dados fictícios)', () => {
     const cleared = await listActivity(null);
     expect(cleared).toHaveLength(1);
     expect(cleared[0]).toMatchObject({ summary: 'Histórico apagado', detail: `tudo (${deleted} itens)` });
+  });
+
+  it('registra cadastrar, editar (com o que mudou) e excluir em clientes, vendedores e produtos', async () => {
+    const [product] = await listProducts();
+    await saveProduct({ ...product!, unitPrice: product!.unitPrice + 100 });
+    const [seller] = await listSellers();
+    await saveSeller({ ...seller!, region: 'Litoral' });
+    await saveSeller({ ...seller!, region: 'Litoral' }); // sem mudança: nada novo
+    await saveCustomer({
+      id: 'c-teste',
+      name: 'Cliente do Teste',
+      kind: 'PF',
+      document: '',
+      phone: '',
+      city: '',
+      seller: 'Carlos Menezes',
+      quotes: 0,
+      lastQuoteAt: null,
+    });
+    await deleteCustomer('c-teste');
+
+    const [deleted, created, sellerEdit, productEdit] = await listActivity(null);
+    expect(deleted).toMatchObject({ area: 'Clientes', summary: 'Cliente Cliente do Teste excluído' });
+    expect(created).toMatchObject({ area: 'Clientes', summary: 'Cliente Cliente do Teste cadastrado' });
+    expect(sellerEdit).toMatchObject({ area: 'Vendedores', summary: `Vendedor ${seller!.name} editado` });
+    expect(sellerEdit!.detail).toContain('região:');
+    expect(productEdit).toMatchObject({ area: 'Produtos', summary: `Produto ${product!.code} editado` });
+    expect(productEdit!.detail).toMatch(/^preço: R\$/);
+    expect((await listActivity('Produtos')).every((a) => a.area === 'Produtos')).toBe(true);
   });
 });

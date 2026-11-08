@@ -1,4 +1,4 @@
-import type { Activity, ActivityArea } from '@/types/activity';
+import type { Activity, LoggedArea } from '@/types/activity';
 import { mockUserName } from './mockSession';
 
 /**
@@ -10,7 +10,7 @@ let log: Activity[] = [];
 let nextId = 1;
 const hiddenQuoteEvents = new Set<string>();
 
-export function recordMockActivity(area: Exclude<ActivityArea, 'Orçamentos'>, summary: string, detail = ''): void {
+export function recordMockActivity(area: LoggedArea, summary: string, detail = ''): void {
   log = [
     ...log,
     { id: `a${nextId++}`, at: new Date().toISOString(), by: mockUserName(), area, summary, detail, quoteId: null, quote: null },
@@ -37,4 +37,20 @@ export function hideMockActivity(ids: readonly string[]): number {
     }
   }
   return before - log.length + hidden;
+}
+
+/** Cadastro salvo no modo fictício: "… cadastrado" ou "… editado" com o que mudou (sem mudança, nada), como a API. */
+export function recordMockSave<T>(
+  area: LoggedArea,
+  title: string,
+  before: T | undefined,
+  after: T,
+  changes: (before: T, after: T) => string,
+): void {
+  if (!before) {
+    recordMockActivity(area, `${title} cadastrado`);
+    return;
+  }
+  const detail = changes(before, after);
+  if (detail) recordMockActivity(area, `${title} editado`, detail);
 }

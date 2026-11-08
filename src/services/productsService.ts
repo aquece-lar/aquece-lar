@@ -1,5 +1,7 @@
 import type { Product } from '@/types/products';
+import { describeProductChanges } from '@/lib/changes';
 import { api, ApiError, isSavedId, USE_MOCKS } from './http';
+import { recordMockActivity, recordMockSave } from './mockActivity';
 import { fromMock } from './mockLatency';
 import { mockEnsure } from './mockSession';
 import { PRODUCTS_MOCK } from './mocks/productsMock';
@@ -53,6 +55,7 @@ export async function saveProduct(product: Product): Promise<Product> {
     if (product.status === 'Inativo' && current?.status !== 'Inativo') products = [...others, product];
     else if (current) products = products.map((p) => (p.id === product.id ? product : p));
     else products = [product, ...products];
+    recordMockSave('Produtos', `Produto ${product.code}`, current, product, describeProductChanges);
     return product;
   });
 }
@@ -61,6 +64,8 @@ export function deleteProduct(id: string): Promise<void> {
   if (!USE_MOCKS) return api<void>('DELETE', `/products/${id}`);
   return fromMock(() => {
     mockEnsure('manageCatalog');
+    const current = products.find((p) => p.id === id);
     products = products.filter((p) => p.id !== id);
+    if (current) recordMockActivity('Produtos', `Produto ${current.code} excluído`);
   });
 }

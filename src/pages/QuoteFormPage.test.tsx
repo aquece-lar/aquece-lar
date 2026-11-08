@@ -208,6 +208,7 @@ describe('padrões vindos das configurações', () => {
         maxDiscountPercent: null,
         expiryAlertDays: 3,
         followUpDays: 3,
+        whatsappMessage: original.quotes.whatsappMessage,
       },
     });
     try {

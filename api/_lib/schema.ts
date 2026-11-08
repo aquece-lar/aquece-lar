@@ -119,7 +119,8 @@ export const SCHEMA: string[] = [
     created_at      timestamptz not null default now(),
     primary key (user_id, notification_id)
   )`,
-  // Excluir orçamento fica no histórico geral (os eventos dele somem junto com ele).
+  // Excluir orçamento fica no histórico geral (os eventos dele somem junto com ele), e os cadastros também.
   `alter table activity_log drop constraint if exists activity_log_area_check`,
-  `alter table activity_log add constraint activity_log_area_check check (area in ('Orçamentos', 'Configurações', 'Usuários'))`,
+  `alter table activity_log add constraint activity_log_area_check
+    check (area in ('Orçamentos', 'Clientes', 'Vendedores', 'Produtos', 'Configurações', 'Usuários'))`,
 ];

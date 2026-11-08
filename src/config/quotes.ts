@@ -9,5 +9,9 @@ export function termDiscount(terms: string): number | null {
   return match?.[1] ? Number(match[1].replace(',', '.')) : null;
 }
 
+export const DEFAULT_WHATSAPP_MESSAGE =
+  'Olá, {cliente}! Segue o orçamento {numero} da {empresa}, no valor de {total}, válido até {validade}. ' +
+  'Qualquer dúvida, estou à disposição. {vendedor}';
+
 export const DEFAULT_NOTES =
   'Prazo de entrega de 7 a 10 dias úteis após a aprovação. Instalação agendada conforme disponibilidade.';

@@ -247,7 +247,7 @@ Corpo: `{ "status": QuoteStatus }`. Transições permitidas (as mesmas que a tel
 
 `Aprovado` é final. Qualquer outra: 409 `invalid_status_transition`.
 
-**WhatsApp:** o envio pelo WhatsApp deve gerar a transição Pendente → Enviado com o evento `"Enviado ao cliente por WhatsApp"` (texto que os mocks já usam). Uma opção é um endpoint próprio, `POST /quotes/:id/send` com `{ "channel": "whatsapp" }`, que envia e registra a transição.
+**WhatsApp:** o botão "Enviar por WhatsApp" do orçamento abre `https://wa.me/<telefone do cliente>?text=<mensagem>` com a mensagem padrão das configurações (`quotes.whatsappMessage`, campos em `src/lib/whatsapp.ts`) e, se o orçamento estiver pendente, chama `POST /quotes/:id/status` com `{ "status": "Enviado", "channel": "whatsapp" }`, que registra o evento `"Enviado ao cliente por WhatsApp"`. Quem envia de fato é o WhatsApp da pessoa; o PDF não vai junto (dá para anexar depois na conversa). Se um dia o envio for pelo bot, a mesma mensagem pode ser usada lá.
 
 ## Vendedores — `/sellers`
 
@@ -310,14 +310,14 @@ Regras:
 
 ## Histórico de alterações — `GET /activity`
 
-Só administrador. Junta os eventos dos orçamentos (`quote_events`) com as alterações de configurações e usuários (`activity_log`), das mais recentes para as mais antigas, no máximo 300. `?area=Orçamentos|Configurações|Usuários` filtra; área inválida: 400 `validation`.
+Só administrador. Junta os eventos dos orçamentos (`quote_events`) com as alterações de cadastros, configurações e usuários (`activity_log`), das mais recentes para as mais antigas, no máximo 300. `?area=Orçamentos|Clientes|Vendedores|Produtos|Configurações|Usuários` filtra; área inválida: 400 `validation`. Cadastrar, editar (com o que mudou, ex.: "preço: R$ 3.790,00 → R$ 3.990,00") e excluir clientes, vendedores e produtos entram sozinhos (o router registra em volta de cada `POST`, `PUT` e `DELETE`).
 
 ```ts
 interface Activity {
   id: string;
   at: string;              // data/hora ISO
   by: string | null;       // nome de quem fez (copiado: vale mesmo se o usuário for excluído)
-  area: 'Orçamentos' | 'Configurações' | 'Usuários';
+  area: 'Orçamentos' | 'Clientes' | 'Vendedores' | 'Produtos' | 'Configurações' | 'Usuários';
   summary: string;         // "Orçamento #1181: Orçamento editado", "Usuário Ana criado"
   detail: string;          // o que mudou; pode ser vazio
   quoteId: string | null;  // para o link do orçamento
@@ -363,6 +363,8 @@ interface Settings {
     notes: string;
     maxDiscountPercent: number | null; // 0 a 100; null = sem limite
     expiryAlertDays: number;           // inteiro de 0 a 60
+    followUpDays: number;              // inteiro de 0 a 60; 0 desliga
+    whatsappMessage: string;           // até 1000 caracteres; {cliente} {numero} {total} {validade} {vendedor} {empresa}
   };
 }
 ```

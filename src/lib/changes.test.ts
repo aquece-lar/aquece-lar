@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import type { QuoteDraft } from '@/types/quotes';
 import { SETTINGS_MOCK } from '@/services/mocks/settingsMock';
-import { describeQuoteChanges, describeSettingsChanges, describeUserChanges, type UserSnapshot } from './changes';
+import { CUSTOMERS_MOCK, SELLERS_MOCK } from '@/services/mocks/peopleMock';
+import { PRODUCTS_MOCK } from '@/services/mocks/productsMock';
+import {
+  describeCustomerChanges,
+  describeProductChanges,
+  describeQuoteChanges,
+  describeSellerChanges,
+  describeSettingsChanges,
+  describeUserChanges,
+  type UserSnapshot,
+} from './changes';
 
 const QUOTE: QuoteDraft = {
   customerInfo: { name: 'Ana', detail: '', phone: '' },
@@ -68,5 +78,28 @@ describe('describeUserChanges', () => {
     expect(describeUserChanges(before, after, true)).toBe(
       'perfil: Gerente → Vendedor; vendedor ligado: — → Carlos Menezes; vê de todos: não → sim; senha trocada',
     );
+  });
+});
+
+describe('cadastros', () => {
+  it('produto: preço, status e fotos', () => {
+    const before = { ...PRODUCTS_MOCK[0]!, unitPrice: 3790, photos: [] };
+    const after = { ...before, unitPrice: 3990, status: 'Inativo' as const, photos: ['data:a'] };
+    expect(describeProductChanges(before, after)).toBe(
+      'preço: R$ 3.790,00 → R$ 3.990,00; status: Ativo → Inativo; fotos: 0 fotos → 1 foto',
+    );
+    expect(describeProductChanges(before, { ...before })).toBe('');
+  });
+
+  it('vendedor: meta e região; as contagens de orçamentos não entram', () => {
+    const before = SELLERS_MOCK[0]!;
+    const after = { ...before, monthlyGoal: null, region: 'Gramado', quotes: 99, amount: 1 };
+    expect(describeSellerChanges(before, after)).toBe('região: Serra Gaúcha → Gramado; meta mensal: R$ 250.000,00 → sem meta');
+  });
+
+  it('cliente: tipo e vendedor', () => {
+    const before = CUSTOMERS_MOCK[0]!;
+    const after = { ...before, kind: 'PF' as const, seller: 'Patrícia Lima' };
+    expect(describeCustomerChanges(before, after)).toBe('tipo: empresa → pessoa; vendedor: Carlos Menezes → Patrícia Lima');
   });
 });

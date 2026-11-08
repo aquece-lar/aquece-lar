@@ -9,6 +9,7 @@ import { ExpiryBadge } from '@/features/quotes/ExpiryBadge';
 import { useSettings } from '@/features/settings/useSettings';
 import { formatBRL, formatDate, formatDateTime, initials } from '@/lib/format';
 import { quoteTotals } from '@/lib/quoteTotals';
+import { fillWhatsappMessage, whatsappLink } from '@/lib/whatsapp';
 import { deleteQuote, updateQuoteStatus } from '@/services/quotesService';
 import type { QuoteStatus } from '@/types/dashboard';
 import type { QuoteContact } from '@/types/quotes';
@@ -122,12 +123,12 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
     return () => window.clearTimeout(timer);
   }, [autoPrint, quote, settingsDone, navigate]);
 
-  async function changeStatus(action: StatusAction) {
+  async function changeStatus(action: StatusAction, channel?: 'whatsapp') {
     if (!quote) return;
     setBusy(true);
     setActionError('');
     try {
-      await updateQuoteStatus(quote.id, action.to);
+      await updateQuoteStatus(quote.id, action.to, channel);
       setConfirming(null);
       setReloadKey((k) => k + 1);
     } catch (error) {
@@ -137,6 +138,23 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Abre o WhatsApp com a mensagem padrão das configurações, já com os dados
+   * do orçamento, para o telefone do cliente. Pendente passa a enviado.
+   */
+  function sendWhatsapp() {
+    if (!quote || !settings.data) return;
+    const text = fillWhatsappMessage(settings.data.quotes.whatsappMessage, {
+      quote,
+      customer: quote.customerInfo,
+      seller: quote.sellerInfo,
+      company: settings.data.company.name,
+    });
+    // Abre antes de qualquer espera: senão o navegador bloqueia a janela nova.
+    window.open(whatsappLink(quote.customerInfo.phone, text), '_blank', 'noopener');
+    if (quote.status === 'Pendente') void changeStatus({ to: 'Enviado', label: '', icon: 'upload' }, 'whatsapp');
   }
 
   async function remove() {
@@ -224,6 +242,12 @@ export function QuoteDetailPage({ autoPrint = false }: { autoPrint?: boolean }) 
             <Icon name="download" size={16} />
             Baixar PDF
           </button>
+          {mine && settings.data && (quote.status === 'Pendente' || quote.status === 'Enviado') && (
+            <button type="button" className="btn btn-secondary" disabled={busy} onClick={sendWhatsapp}>
+              <Icon name="chat" size={16} />
+              {quote.status === 'Enviado' ? 'Reenviar por WhatsApp' : 'Enviar por WhatsApp'}
+            </button>
+          )}
           {(mine ? ACTIONS[quote.status] : []).map((action) => (
             <button
               key={action.to}

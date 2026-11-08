@@ -1,7 +1,17 @@
 /** Onde a alteração aconteceu. */
-export type ActivityArea = 'Orçamentos' | 'Configurações' | 'Usuários';
+export type ActivityArea = 'Orçamentos' | 'Clientes' | 'Vendedores' | 'Produtos' | 'Configurações' | 'Usuários';
 
-export const ACTIVITY_AREAS: readonly ActivityArea[] = ['Orçamentos', 'Configurações', 'Usuários'];
+export const ACTIVITY_AREAS: readonly ActivityArea[] = [
+  'Orçamentos',
+  'Clientes',
+  'Vendedores',
+  'Produtos',
+  'Configurações',
+  'Usuários',
+];
+
+/** As que ficam em activity_log; os orçamentos vêm de quote_events. */
+export type LoggedArea = Exclude<ActivityArea, 'Orçamentos'>;
 
 /** Uma linha do histórico de alterações (Configurações → Histórico). */
 export interface Activity {
